@@ -4,16 +4,22 @@ def criar_banco():
     conn = sqlite3.connect('dados_smart.db')
     cursor = conn.cursor()
     
-    # Tabela para configurar quais campos a API deles oferece
+    # Tabela de Usuários (Com matrícula PMS)
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS campos_disponiveis (
+        CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            campo_chave TEXT NOT NULL,
-            label_amigavel TEXT NOT NULL
+            matricula TEXT UNIQUE NOT NULL,
+            cpf TEXT UNIQUE NOT NULL,
+            nome_completo TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            celular TEXT,
+            data_nascimento TEXT,
+            senha_hash TEXT NOT NULL,
+            codigo_verificacao TEXT,
+            ativo INTEGER DEFAULT 0
         )
     ''')
     
-    # Tabela de Auditoria (Essencial para Segurança/LGPD)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS logs_consulta (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,16 +28,7 @@ def criar_banco():
             data_hora DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
-    # Inserindo alguns campos de exemplo para sua interface
-    campos = [
-        ('nome', 'Nome Completo'),
-        ('valor_divida', 'Valor do Débito'),
-        ('data_vencimento', 'Data de Vencimento'),
-        ('status', 'Situação Atual')
-    ]
-    cursor.executemany('INSERT OR IGNORE INTO campos_disponiveis (campo_chave, label_amigavel) VALUES (?,?)', campos)
-    
+
     conn.commit()
     conn.close()
 

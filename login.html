@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Dados Smart - Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .card-login { max-width: 400px; margin: 100px auto; }
+    </style>
+</head>
+<body class="bg-light">
+    <div id="notificacoes" class="toast-container"></div>
+
+    <div class="card shadow card-login">
+        <div class="card-header bg-primary text-white text-center"><h4>Acesso Dados Smart</h4></div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label>Matrícula PMS:</label>
+                <input type="text" id="matricula" class="form-control">
+            </div>
+            <div class="mb-3">
+                <label>Senha:</label>
+                <input type="password" id="senha" class="form-control">
+            </div>
+            <button onclick="realizarLogin()" class="btn btn-primary w-100">Entrar</button>
+            <hr>
+            <div class="text-center">
+                <a href="esqueci_senha.html">Esqueci minha senha</a><br>
+                <a href="fazer_cadastro.html">Criar nova conta</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function avisar(msg, tipo="info") {
+            const id = 'toast' + Date.now();
+            const html = `
+                <div id="${id}" class="alert alert-${tipo} alert-dismissible fade show shadow">
+                    ${msg} <button class="btn-close" data-bs-dismiss="alert"></button>
+                </div>`;
+            document.getElementById('notificacoes').innerHTML += html;
+            setTimeout(() => { document.getElementById(id)?.remove(); }, 3000);
+        }
+
+        async function realizarLogin() {
+            const matricula = document.getElementById('matricula').value;
+            const senha = document.getElementById('senha').value;
+
+            try {
+                const res = await fetch("http://127.0.0.1:8000/auth/login", {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({matricula, senha})
+                });
+                const dados = await res.json();
+
+                if (res.ok) {
+                    avisar(dados.msg, "success");
+                    if (dados.aniversario) {
+                        setTimeout(() => avisar("🎂 FELIZ ANIVERSÁRIO! 🎂", "warning"), 500);
+                    }
+                    setTimeout(() => { window.location.href = "index.html"; }, 3500);
+                } else {
+                    avisar(dados.detail, "danger");
+                }
+            } catch (e) { avisar("Erro ao conectar com servidor.", "danger"); }
+        }
+    </script>
+</body>
+</html>

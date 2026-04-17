@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Dados Smart - Recuperar Senha</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+        .card-recovery { max-width: 450px; margin: 80px auto; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="bg-light">
+
+    <div id="notificacoes" class="toast-container"></div>
+
+    <div class="card shadow card-recovery">
+        <div class="card-header bg-dark text-white text-center">
+            <h4>Recuperar Senha</h4>
+        </div>
+        <div class="card-body">
+            
+            <div id="passo1">
+                <p class="text-muted">Insira o seu e-mail cadastrado para receber o código de recuperação.</p>
+                <div class="mb-3">
+                    <label class="form-label">E-mail:</label>
+                    <input type="email" id="emailRecuperacao" class="form-control" placeholder="exemplo@email.com">
+                </div>
+                <button onclick="solicitarCodigo()" id="btnCodigo" class="btn btn-primary w-100">Enviar Código</button>
+            </div>
+
+            <div id="passo2" class="hidden">
+                <div class="alert alert-info small">
+                    O código foi enviado para o seu e-mail. Por favor, verifique a sua caixa de entrada.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Código de Verificação:</label>
+                    <input type="text" id="codigoValidacao" class="form-control" placeholder="000000">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Nova Senha:</label>
+                    <input type="password" id="novaSenha" class="form-control" placeholder="Mínimo 8 caracteres">
+                    <small class="text-muted">Deve conter letras (A/a), números e símbolos.</small>
+                </div>
+                <button onclick="redefinirSenha()" id="btnRedefinir" class="btn btn-success w-100">Redefinir Senha</button>
+            </div>
+
+            <div class="text-center mt-3">
+                <a href="login.html" class="text-decoration-none">Voltar ao Login</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+
+        function avisar(msg, tipo="info") {
+            const id = 'toast' + Date.now();
+            const html = `
+                <div id="${id}" class="alert alert-${tipo} alert-dismissible fade show shadow">
+                    ${msg} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>`;
+            document.getElementById('notificacoes').innerHTML += html;
+            
+            // As mensagens desaparecem sozinhas em 3 segundos
+            setTimeout(() => {
+                const el = document.getElementById(id);
+                if (el) el.remove();
+            }, 3000);
+        }
+
+        async function solicitarCodigo() {
+            const email = document.getElementById('emailRecuperacao').value.trim();
+            if (!email) return avisar("Por favor, preencha o e-mail.", "warning");
+
+            const btn = document.getElementById('btnCodigo');
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_URL}/auth/esqueci-senha`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email })
+                });
+
+                if (res.ok) {
+                    const dados = await res.json();
+                    avisar("Código de recuperação gerado com sucesso!", "success");
+                    // Nota: No ambiente de teste, o código aparece no log do Python (terminal)
+                    document.getElementById('passo1').classList.add('hidden');
+                    document.getElementById('passo2').classList.remove('hidden');
+                } else {
+                    const erro = await res.json();
+                    avisar(erro.detail || "Erro ao processar solicitação.", "danger");
+                }
+            } catch (e) {
+                avisar("Erro ao conectar com o servidor.", "danger");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function redefinirSenha() {
+            const email = document.getElementById('emailRecuperacao').value;
+            const codigo = document.getElementById('codigoValidacao').value;
+            const nova_senha = document.getElementById('novaSenha').value;
+
+            if (!codigo || !nova_senha) return avisar("Preencha todos os campos.", "warning");
+
+            const btn = document.getElementById('btnRedefinir');
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_URL}/auth/redefinir-senha`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email, codigo, nova_senha })
+                });
+
+                const dados = await res.json();
+
+                if (res.ok) {
+                    avisar(dados.msg, "success");
+                    // Redireciona para o login após 3 segundos
+                    setTimeout(() => { window.location.href = "login.html"; }, 3000);
+                } else {
+                    avisar(dados.detail || "Código inválido ou senha fraca.", "danger");
+                }
+            } catch (e) {
+                avisar("Erro ao processar redefinição.", "danger");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
