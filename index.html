@@ -2,60 +2,46 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Dados Smart - Relatórios Consolidados</title>
+    <title>Dados Smart - Painel Integrador</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
         @media print { .no-print { display: none !important; } }
         .modal-xl { max-width: 90%; }
-        .table-responsive { max-height: 600px; overflow-y: auto; }
-        .card-header { font-weight: bold; }
+        .table-responsive { max-height: 500px; overflow-y: auto; }
     </style>
 </head>
 <body class="bg-light">
 
 <div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-3 no-print">
-        <h5 id="boasVindas">Painel de Consulta Dados Smart</h5>
-    </div>
-
     <div class="card shadow no-print mb-4">
         <div class="card-header bg-primary text-white">
-            <h4 class="mb-0">Gerador de Relatórios</h4>
+            <h4 class="mb-0">Gerador de Relatórios Consolidados</h4>
         </div>
         <div class="card-body">
             <form id="formConsulta" class="row g-3">
-                <div class="col-md-6">
-                    <label class="form-label fw-bold">Documento (CPF ou CNPJ):</label>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Tipo de Pesquisa:</label>
+                    <select id="tipoPesquisa" class="form-select">
+                        <option value="documento">CPF / CNPJ</option>
+                        <option value="cda">Número da CDA</option>
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label fw-bold">Identificador (Número):</label>
                     <input type="text" id="documento" class="form-control" placeholder="Digite apenas números">
                 </div>
+                
                 <div class="col-12">
                     <h6>Campos para o Relatório:</h6>
                     <div id="opcoes-campos" class="p-3 border rounded bg-white">
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="nome" id="opt-nome" checked>
-                            <label class="form-check-label" for="opt-nome">Nome/Razão Social</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="documento" id="opt-doc" checked>
-                            <label class="form-check-label" for="opt-doc">Documento</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="valor_divida" id="opt-valor" checked>
-                            <label class="form-check-label" for="opt-valor">Valor da Dívida</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="data_vencimento" id="opt-venc" checked>
-                            <label class="form-check-label" for="opt-venc">Data de Vencimento</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="status" id="opt-status" checked>
-                            <label class="form-check-label" for="opt-status">Situação/Status</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="endereco" id="opt-end">
-                            <label class="form-check-label" for="opt-end">Endereço/Município</label>
-                        </div>
+                        <input class="coluna-opt" type="checkbox" value="nome" checked> Nome 
+                        <input class="coluna-opt" type="checkbox" value="documento" checked> Documento 
+                        <input class="coluna-opt" type="checkbox" value="exercicio" checked> Exercício
+                        <input class="coluna-opt" type="checkbox" value="valor_divida" checked> Valor 
+                        <input class="coluna-opt" type="checkbox" value="status" checked> Status
+                        <input class="coluna-opt" type="checkbox" value="estornado" checked> Estornado
+                        <input class="coluna-opt" type="checkbox" value="endereco" checked> Endereço
                     </div>
                 </div>
                 <div class="col-12">
@@ -65,88 +51,76 @@
             </form>
         </div>
     </div>
+</div>
 
-    <div id="resultadoTabela" class="card shadow d-none">
-        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-            <span>Resultado da Consulta</span>
-            <button class="btn btn-sm btn-light no-print" onclick="window.print()">Imprimir</button>
-        </div>
-        <div class="card-body">
-            <div class="table-responsive" id="conteudoTabela">
-                </div>
+<div class="modal fade" id="modalResultado" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">Relatório de Consulta Smart</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive" id="conteudoTabela"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" onclick="window.print()">Imprimir</button>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
 const API_URL = "http://127.0.0.1:8000";
+let bootstrapModal;
+
+document.addEventListener('DOMContentLoaded', () => {
+    bootstrapModal = new bootstrap.Modal(document.getElementById('modalResultado'));
+});
 
 async function consultar() {
-    const docInput = document.getElementById('documento').value;
-    if (!docInput) return alert("Por favor, insira um CPF ou CNPJ.");
+    const doc = document.getElementById('documento').value;
+    const tipo = document.getElementById('tipoPesquisa').value;
+    if (!doc) return alert("Insira um número para pesquisa.");
 
     try {
-        // Rota de consulta do backend que integra com a BrasilAPI ou Mock
-        const res = await fetch(`${API_URL}/consultar?documento=${docInput}`);
+        const res = await fetch(`${API_URL}/consultar?documento=${doc}&tipo=${tipo}`);
         const dados = await res.json();
-
         if (res.ok) {
             renderizarTabela(dados);
+            bootstrapModal.show();
         } else {
-            alert("Erro na consulta: " + (dados.detail || "Erro desconhecido"));
+            alert("Erro: " + (dados.detail || "Falha na consulta"));
         }
-    } catch (error) {
-        console.error("Erro de conexão:", error);
-        alert("Não foi possível conectar ao servidor backend.");
-    }
+    } catch (e) { alert("Erro de conexão com o servidor."); }
 }
 
 function renderizarTabela(dados) {
-    const area = document.getElementById('resultadoTabela');
     const conteudo = document.getElementById('conteudoTabela');
-    
-    // Obtém apenas as colunas que o usuário marcou como visíveis
-    const checkboxes = document.querySelectorAll('.coluna-opt:checked');
-    const colunas = Array.from(checkboxes).map(cb => ({
+    const colunas = Array.from(document.querySelectorAll('.coluna-opt:checked')).map(cb => ({
         id: cb.value,
-        label: cb.nextElementSibling.innerText
+        label: cb.nextSibling.textContent.trim()
     }));
 
-    if (colunas.length === 0) return alert("Selecione ao menos um campo para o relatório.");
+    let html = `<table class="table table-bordered table-striped"><thead><tr>`;
+    colunas.forEach(col => html += `<th>${col.label}</th>`);
+    html += `</tr></thead><tbody><tr>`;
 
-    let html = `<table class="table table-bordered table-striped">
-                    <thead class="table-secondary">
-                        <tr>`;
-    
+    const item = Array.isArray(dados) ? dados[0] : dados;
     colunas.forEach(col => {
-        html += `<th>${col.label}</th>`;
+        let valor = item[col.id] || "Nada Consta";
+        html += `<td>${valor}</td>`;
     });
-
-    html += `</tr></thead><tbody>`;
-
-    // Transforma objeto único em array para compatibilidade de loop se necessário
-    const listaDados = Array.isArray(dados) ? dados : [dados];
-
-    listaDados.forEach(item => {
-        html += `<tr>`;
-        colunas.forEach(col => {
-            let valor = item[col.id] || "Nada Consta";
-            html += `<td>${valor}</td>`;
-        });
-        html += `</tr>`;
-    });
-
-    html += `</tbody></table>`;
+    html += `</tr></tbody></table>`;
     conteudo.innerHTML = html;
-    area.classList.remove('d-none');
 }
 
 function baixarPDF() {
     const doc = document.getElementById('documento').value;
-    if (!doc) return alert("Digite um documento antes de gerar o PDF.");
-    
-    // Abre a rota de geração de PDF do seu backend em uma nova aba
-    window.open(`${API_URL}/gerar-pdf/${doc}`, '_blank');
+    const tipo = document.getElementById('tipoPesquisa').value;
+    if (!doc) return alert("Digite um identificador.");
+    window.open(`${API_URL}/gerar-pdf/${doc}?tipo=${tipo}`, '_blank');
 }
 </script>
 </body>
