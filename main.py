@@ -16,7 +16,7 @@ from datetime import datetime
 
 app = FastAPI(title="Dados Smart - Integrador")
 
-# Configuração de Criptografia
+# Configuração de Criptografia - Requer: pip install "passlib[bcrypt]"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app.add_middleware(
@@ -29,8 +29,8 @@ app.add_middleware(
 
 # --- CONFIGURAÇÃO DE E-MAIL ---
 def enviar_email_real(destinatario, codigo, assunto="Código de Verificação - Dados Smart"):
-    remetente = "contatotech.tecnologia@gmail.com" 
-    senha = "tvlaqhnfvqtsqvsu" 
+    remetente = "contatotech.tecnologia@gmail.com"
+    senha = "tvlaqhnfvqtsqvsu"
     
     corpo = f"Seu código para o sistema Dados Smart é: {codigo}"
     msg = MIMEText(corpo)
@@ -39,6 +39,7 @@ def enviar_email_real(destinatario, codigo, assunto="Código de Verificação - 
     msg['To'] = destinatario
 
     try:
+        # Uso da porta 587 com STARTTLS para evitar bloqueios
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls() 
         server.login(remetente, senha)
@@ -60,7 +61,7 @@ def validar_senha(senha: str):
 # --- ROTAS DE AUTENTICAÇÃO ---
 @app.post("/auth/cadastrar")
 async def cadastrar(dados: dict = Body(...)):
-    # Valida a complexidade antes de truncar
+    # Valida a complexidade da senha original
     if not validar_senha(dados['senha']):
         raise HTTPException(status_code=400, detail="Senha fraca: use 8+ caracteres, maiúsculas, minúsculas, números e símbolos.")
     
@@ -68,8 +69,12 @@ async def cadastrar(dados: dict = Body(...)):
     conn = None 
 
     try:
-        # AJUSTE: Truncar para 72 bytes para evitar erro do bcrypt
-        senha_hash = pwd_context.hash(dados['senha'][:72])
+        # SOLUÇÃO DEFINITIVA PARA O ERRO DE 72 BYTES:
+        # 1. Converte para bytes usando UTF-8
+        # 2. Trunca os primeiros 72 bytes
+        senha_bytes = dados['senha'].encode('utf-8')[:72]
+        # 3. Gera o hash a partir dos bytes truncados
+        senha_hash = pwd_context.hash(senha_bytes)
         
         destinatario_usuario = dados.get('email')
         if not enviar_email_real(destinatario_usuario, codigo, "Ative sua conta - Dados Smart"):
@@ -85,7 +90,7 @@ async def cadastrar(dados: dict = Body(...)):
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=400, detail="Matrícula, CPF ou E-mail já cadastrados.")
     except Exception as e:
-        print(f"Erro interno: {e}")
+        print(f"Erro interno no cadastro: {e}")
         raise HTTPException(status_code=500, detail=f"Erro interno no servidor: {str(e)}")
     finally:
         if conn:
@@ -95,16 +100,20 @@ async def cadastrar(dados: dict = Body(...)):
 async def login(dados: dict = Body(...)):
     conn = sqlite3.connect('dados_smart.db')
     cursor = conn.cursor()
+    # Busca apenas usuários ativos
     cursor.execute("SELECT senha_hash, nome_completo, data_nascimento FROM usuarios WHERE matricula = ? AND ativo = 1", (dados['matricula'],))
     user = cursor.fetchone()
     conn.close()
 
-    # AJUSTE: Truncar a senha no login também para bater com o hash do cadastro
-    if user and pwd_context.verify(dados['senha'][:72], user[0]):
-        hoje = datetime.now().strftime("%m-%d")
-        try:
-            aniv = datetime.strptime(user[2], "%Y-%m-%d").strftime("%m-%d") if user[2] else ""
-        except:
-            aniv = ""
-        return {"status": "sucesso", "nome": user[1], "aniversario": (hoje == aniv), "msg": "Bem vindo ao sistema!"}
+    if user:
+        # Aplica o mesmo tratamento de bytes no login para comparação correta
+        senha_bytes_login = dados['senha'].encode('utf-8')[:72]
+        if pwd_context.verify(senha_bytes_login, user[0]):
+            hoje = datetime.now().strftime("%m-%d")
+            try:
+                aniv = datetime.strptime(user[2], "%Y-%m-%d").strftime("%m-%d") if user[2] else ""
+            except:
+                aniv = ""
+            return {"status": "sucesso", "nome": user[1], "aniversario": (hoje == aniv), "msg": "Bem vindo ao sistema!"}
+            
     raise HTTPException(status_code=401, detail="Credenciais incorretas ou conta inativa.")
