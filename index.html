@@ -55,10 +55,9 @@
                         </div>
                     </div>
                     <div class="col-12 no-print">
-    <button type="button" onclick="consultar()" class="btn btn-success">Visualizar Tabela</button>
-    <button type="button" onclick="baixarPDF()" class="btn btn-danger">Gerar PDF Oficial</button>
-    <!-- <button type="button" onclick="window.print()" class="btn btn-secondary">Imprimir Rápido</button> -->
-</div>
+                        <button type="button" onclick="consultar(event); return false;" class="btn btn-success">Visualizar Tabela</button>
+                        <button type="button" onclick="baixarPDF()" class="btn btn-danger">Gerar PDF Oficial</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -73,71 +72,72 @@
             return Array.from(checkboxes).map(cb => cb.value).join(',');
         }
 
-        async function consultar() {
-    // 1. Pega o elemento do formulário/input
-    const inputDoc = document.getElementById('documento');
-    const doc = inputDoc.value;
+        async function consultar(event) {
+            // Impede o comportamento padrão de recarregar a página
+            if (event) event.preventDefault();
 
-    if (!doc) { 
-        alert("Informe um documento."); 
-        return false; // Impede continuação
-    }
+            const inputDoc = document.getElementById('documento');
+            const doc = inputDoc.value;
 
-    const campos = getCamposSelecionados();
-
-    try {
-        const response = await fetch(`http://127.0.0.1:8000/gerar-relatorio?documento=${doc}&campos_selecionados=${campos}`);
-        
-        if (!response.ok) {
-            throw new Error('Erro na resposta do servidor');
-        }
-
-        const dados = await response.json();
-
-        // 2. Monta o HTML da tabela
-        let html = `
-            <div class="report-header">
-                <h3>DADOS SMART - RELATÓRIO OFICIAL</h3>
-            </div>
-            <table class="table table-bordered mt-3 bg-white">
-                <thead class="table-dark">
-                    <tr>`;
-        
-        Object.keys(dados).forEach(key => {
-            html += `<th class="text-capitalize">${key.replace('_', ' ')}</th>`;
-        });
-        
-        html += `</tr></thead><tbody><tr>`;
-        
-        Object.values(dados).forEach(val => {
-            if (typeof val === 'number' && !isNaN(val)) {
-                val = val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            if (!doc) { 
+                alert("Informe um documento."); 
+                return false; 
             }
-            html += `<td>${val}</td>`;
-        });
 
-        html += `</tr></tbody></table>`;
+            const campos = getCamposSelecionados();
 
-        // 3. Insere o resultado e GARANTE que não haverá refresh
-        const divResultado = document.getElementById('resultado');
-        divResultado.innerHTML = html;
-        
-        console.log("Tabela gerada com sucesso!");
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/gerar-relatorio?documento=${doc}&campos_selecionados=${campos}`);
+                
+                if (!response.ok) {
+                    throw new Error('Erro na resposta do servidor');
+                }
 
-    } catch (error) {
-        console.error("Erro detalhado:", error);
-        alert("Erro ao conectar com o servidor. Verifique se o Python está rodando.");
-    }
+                const dados = await response.json();
 
-    return false; // Trava final para evitar refresh de qualquer formulário pai
-}
+                // Monta o HTML da tabela
+                let html = `
+                    <div class="report-header">
+                        <h3>DADOS SMART - RELATÓRIO OFICIAL</h3>
+                    </div>
+                    <table class="table table-bordered mt-3 bg-white">
+                        <thead class="table-dark">
+                            <tr>`;
+                
+                Object.keys(dados).forEach(key => {
+                    html += `<th class="text-capitalize">${key.replace('_', ' ')}</th>`;
+                });
+                
+                html += `</tr></thead><tbody><tr>`;
+                
+                Object.values(dados).forEach(val => {
+                    if (typeof val === 'number' && !isNaN(val)) {
+                        val = val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                    }
+                    html += `<td>${val}</td>`;
+                });
+
+                html += `</tr></tbody></table>`;
+
+                // Insere o resultado na div
+                const divResultado = document.getElementById('resultado');
+                divResultado.innerHTML = html;
+                
+                console.log("Tabela gerada com sucesso!");
+
+            } catch (error) {
+                console.error("Erro detalhado:", error);
+                alert("Erro ao conectar com o servidor. Verifique se o Python está rodando.");
+            }
+
+            return false;
+        }
 
         function baixarPDF() {
             const doc = document.getElementById('documento').value;
             if (!doc) { alert("Informe um CPF ou CNPJ."); return; }
             
             const campos = getCamposSelecionados();
-            // Abre em uma nova aba para iniciar o download
             window.open(`http://127.0.0.1:8000/gerar-pdf?documento=${doc}&campos_selecionados=${campos}`, '_blank');
         }
     </script>
