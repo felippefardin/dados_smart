@@ -60,6 +60,10 @@ async def cadastrar(dados: dict = Body(...)):
         raise HTTPException(status_code=400, detail="Senha fraca: use 8+ caracteres, maiúsculas, minúsculas, números e símbolos.")
     
     codigo = str(random.randint(100000, 999999))
+
+    # PEGA O EMAIL DIRETAMENTE DO DICIONÁRIO 'DADOS' ENVIADO PELO FRONTEND
+    destinatario_usuario = dados.get('email')
+    email_enviado = enviar_email_real(destinatario_usuario, codigo, "Ative sua conta - Dados Smart")
     
     # Envio Real de E-mail
     if not enviar_email_real(dados['email'], codigo, "Ative sua conta - Dados Smart"):

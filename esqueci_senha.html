@@ -70,35 +70,23 @@
         }
 
         async function solicitarCodigo() {
-            const email = document.getElementById('emailRecuperacao').value.trim();
-            if (!email) return avisar("Por favor, preencha o e-mail.", "warning");
+    const email = document.getElementById('email_recuperacao').value;
 
-            const btn = document.getElementById('btnCodigo');
-            btn.disabled = true;
+    try {
+        const response = await fetch("http://127.0.0.1:8000/auth/esqueci-senha", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email })
+        });
 
-            try {
-                const res = await fetch(`${API_URL}/auth/esqueci-senha`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ email })
-                });
-
-                if (res.ok) {
-                    const dados = await res.json();
-                    avisar("Código de recuperação gerado com sucesso!", "success");
-                    // Nota: No ambiente de teste, o código aparece no log do Python (terminal)
-                    document.getElementById('passo1').classList.add('hidden');
-                    document.getElementById('passo2').classList.remove('hidden');
-                } else {
-                    const erro = await res.json();
-                    avisar(erro.detail || "Erro ao processar solicitação.", "danger");
-                }
-            } catch (e) {
-                avisar("Erro ao conectar com o servidor.", "danger");
-            } finally {
-                btn.disabled = false;
-            }
+        if (response.ok) {
+            alert("Verifique sua caixa de entrada!");
+        } else {
+            const erro = await response.json();
+            alert(erro.detail);
         }
+    } catch (e) { alert("Erro de conexão."); }
+}
 
         async function redefinirSenha() {
             const email = document.getElementById('emailRecuperacao').value;

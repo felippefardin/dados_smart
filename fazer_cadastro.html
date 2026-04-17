@@ -28,7 +28,9 @@
     </div>
 
     <script>
+        // Use apenas uma função para enviar o cadastro inicial
         async function pedirCodigo() {
+            // Coleta os dados usando os IDs corretos do HTML
             const dados = {
                 matricula: document.getElementById('mat').value,
                 cpf: document.getElementById('cpf').value,
@@ -38,28 +40,55 @@
                 data_nascimento: document.getElementById('nasc').value,
                 senha: document.getElementById('pass').value
             };
-            const res = await fetch("http://127.0.0.1:8000/auth/cadastrar", {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(dados)
-            });
-            if(res.ok) {
-                document.getElementById('step1').style.display = 'none';
-                document.getElementById('step2').style.display = 'block';
-            } else {
-                const err = await res.json(); alert(err.detail);
+
+            // Validação básica antes de enviar
+            if (!dados.email || !dados.senha || !dados.matricula) {
+                alert("Por favor, preencha os campos obrigatórios.");
+                return;
+            }
+
+            try {
+                const res = await fetch("http://127.0.0.1:8000/auth/cadastrar", {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(dados)
+                });
+
+                const result = await res.json();
+
+                if(res.ok) {
+                    alert("Código enviado para o seu e-mail!");
+                    document.getElementById('step1').style.display = 'none';
+                    document.getElementById('step2').style.display = 'block';
+                } else {
+                    alert("Erro: " + (result.detail || "Falha ao cadastrar"));
+                }
+            } catch (error) {
+                console.error("Erro na conexão:", error);
+                alert("Não foi possível conectar ao servidor. Verifique se o backend está rodando na porta 8000.");
             }
         }
 
         async function finalizar() {
-            const res = await fetch("http://127.0.0.1:8000/auth/verificar-cadastro", {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({email: document.getElementById('email').value, codigo: document.getElementById('codigo').value})
-            });
-            if(res.ok) {
-                alert("Cadastro realizado com sucesso!");
-                window.location.href = "login.html";
+            const email = document.getElementById('email').value;
+            const codigo = document.getElementById('codigo').value;
+
+            try {
+                const res = await fetch("http://127.0.0.1:8000/auth/verificar-cadastro", {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email: email, codigo: codigo })
+                });
+
+                if(res.ok) {
+                    alert("Cadastro realizado com sucesso!");
+                    window.location.href = "login.html";
+                } else {
+                    const err = await res.json();
+                    alert("Erro na verificação: " + err.detail);
+                }
+            } catch (error) {
+                alert("Erro ao conectar com o servidor.");
             }
         }
     </script>
