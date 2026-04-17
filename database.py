@@ -33,4 +33,5 @@ def criar_banco():
     conn.close()
 
 if __name__ == "__main__":
-    criar_banco()
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)

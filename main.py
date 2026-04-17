@@ -28,7 +28,7 @@ app.add_middleware(
 # --- CONFIGURAÇÃO DE E-MAIL ---
 def enviar_email_real(destinatario, codigo, assunto="Código de Verificação - Dados Smart"):
     remetente = "contatotech.tecnologia@gmail.com" 
-    senha = "tvla qhnf vqts qvsu" 
+    senha = "tvlaqhnfvqtsqvsu" 
     
     corpo = f"Seu código para o sistema Dados Smart é: {codigo}"
     msg = MIMEText(corpo)
@@ -60,17 +60,16 @@ async def cadastrar(dados: dict = Body(...)):
         raise HTTPException(status_code=400, detail="Senha fraca: use 8+ caracteres, maiúsculas, minúsculas, números e símbolos.")
     
     codigo = str(random.randint(100000, 999999))
-
-    # PEGA O EMAIL DIRETAMENTE DO DICIONÁRIO 'DADOS' ENVIADO PELO FRONTEND
-    destinatario_usuario = dados.get('email')
-    email_enviado = enviar_email_real(destinatario_usuario, codigo, "Ative sua conta - Dados Smart")
-    
-    # Envio Real de E-mail
-    if not enviar_email_real(dados['email'], codigo, "Ative sua conta - Dados Smart"):
-        print(f"--- FALHA NO SMTP. CÓDIGO NO TERMINAL: {codigo} ---")
+    conn = None # Inicializa a variável como None
 
     try:
         senha_hash = pwd_context.hash(dados['senha'])
+        
+        # Tenta enviar o e-mail, mas não trava o processo se falhar
+        destinatario_usuario = dados.get('email')
+        if not enviar_email_real(destinatario_usuario, codigo, "Ative sua conta - Dados Smart"):
+            print(f"--- FALHA NO SMTP. CÓDIGO NO TERMINAL: {codigo} ---")
+
         conn = sqlite3.connect('dados_smart.db')
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO usuarios (matricula, cpf, nome_completo, email, celular, data_nascimento, senha_hash, codigo_verificacao) 
@@ -80,9 +79,13 @@ async def cadastrar(dados: dict = Body(...)):
         return {"status": "sucesso", "msg": "Código enviado ao e-mail!"}
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=400, detail="Matrícula, CPF ou E-mail já cadastrados.")
+    except Exception as e:
+        print(f"Erro interno: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno no servidor.")
     finally:
-        conn.close()
-
+        if conn: # Só tenta fechar se a conexão foi aberta
+            conn.close()
+            
 @app.post("/auth/login")
 async def login(dados: dict = Body(...)):
     conn = sqlite3.connect('dados_smart.db')
