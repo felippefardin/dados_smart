@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Dados Smart - Relatórios</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        @media print { 
+            .no-print { display: none !important; } 
+            .card { border: none !important; box-shadow: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="card shadow no-print">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Gerador de Relatórios Personalizados (CPF/CNPJ)</h4>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label font-weight-bold">Documento para Consulta:</label>
+                        <input type="text" id="documento" class="form-control" placeholder="Digite CPF ou CNPJ">
+                    </div>
+                    <div class="col-12">
+                        <h6>Selecione os dados que deseja na tabela:</h6>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input coluna-opt" type="checkbox" value="nome" checked>
+                            <label class="form-check-label">Nome</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input coluna-opt" type="checkbox" value="documento" checked>
+                            <label class="form-check-label">Documento</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input coluna-opt" type="checkbox" value="valor_divida" checked>
+                            <label class="form-check-label">Valor</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input coluna-opt" type="checkbox" value="data_vencimento">
+                            <label class="form-check-label">Vencimento</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input coluna-opt" type="checkbox" value="status">
+                            <label class="form-check-label">Status</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input coluna-opt" type="checkbox" value="tipo_pessoa">
+                            <label class="form-check-label">Tipo Pessoa</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input coluna-opt" type="checkbox" value="endereco">
+                            <label class="form-check-label">Endereço</label>
+                        </div>
+                    </div>
+                    <div class="col-12 no-print">
+    <button type="button" onclick="consultar()" class="btn btn-success">Visualizar Tabela</button>
+    <button type="button" onclick="baixarPDF()" class="btn btn-danger">Gerar PDF Oficial</button>
+    <!-- <button type="button" onclick="window.print()" class="btn btn-secondary">Imprimir Rápido</button> -->
+</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultado" class="mt-5"></div>
+    </div>
+
+    <script>
+        // Pega os campos marcados pelo usuário
+        function getCamposSelecionados() {
+            const checkboxes = document.querySelectorAll('.coluna-opt:checked');
+            return Array.from(checkboxes).map(cb => cb.value).join(',');
+        }
+
+        async function consultar() {
+    // 1. Pega o elemento do formulário/input
+    const inputDoc = document.getElementById('documento');
+    const doc = inputDoc.value;
+
+    if (!doc) { 
+        alert("Informe um documento."); 
+        return false; // Impede continuação
+    }
+
+    const campos = getCamposSelecionados();
+
+    try {
+        const response = await fetch(`http://127.0.0.1:8000/gerar-relatorio?documento=${doc}&campos_selecionados=${campos}`);
+        
+        if (!response.ok) {
+            throw new Error('Erro na resposta do servidor');
+        }
+
+        const dados = await response.json();
+
+        // 2. Monta o HTML da tabela
+        let html = `
+            <div class="report-header">
+                <h3>DADOS SMART - RELATÓRIO OFICIAL</h3>
+            </div>
+            <table class="table table-bordered mt-3 bg-white">
+                <thead class="table-dark">
+                    <tr>`;
+        
+        Object.keys(dados).forEach(key => {
+            html += `<th class="text-capitalize">${key.replace('_', ' ')}</th>`;
+        });
+        
+        html += `</tr></thead><tbody><tr>`;
+        
+        Object.values(dados).forEach(val => {
+            if (typeof val === 'number' && !isNaN(val)) {
+                val = val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            }
+            html += `<td>${val}</td>`;
+        });
+
+        html += `</tr></tbody></table>`;
+
+        // 3. Insere o resultado e GARANTE que não haverá refresh
+        const divResultado = document.getElementById('resultado');
+        divResultado.innerHTML = html;
+        
+        console.log("Tabela gerada com sucesso!");
+
+    } catch (error) {
+        console.error("Erro detalhado:", error);
+        alert("Erro ao conectar com o servidor. Verifique se o Python está rodando.");
+    }
+
+    return false; // Trava final para evitar refresh de qualquer formulário pai
+}
+
+        function baixarPDF() {
+            const doc = document.getElementById('documento').value;
+            if (!doc) { alert("Informe um CPF ou CNPJ."); return; }
+            
+            const campos = getCamposSelecionados();
+            // Abre em uma nova aba para iniciar o download
+            window.open(`http://127.0.0.1:8000/gerar-pdf?documento=${doc}&campos_selecionados=${campos}`, '_blank');
+        }
+    </script>
+</body>
+</html>
