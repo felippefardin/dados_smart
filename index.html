@@ -4,11 +4,13 @@
     <meta charset="UTF-8">
     <title>Dados Smart - Relatórios</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
         @media print { 
             .no-print { display: none !important; } 
             .card { border: none !important; box-shadow: none !important; }
         }
+        .modal-xl { max-width: 90%; }
     </style>
 </head>
 <body class="bg-light">
@@ -25,33 +27,35 @@
                     </div>
                     <div class="col-12">
                         <h6>Selecione os dados que deseja na tabela:</h6>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="nome" checked>
-                            <label class="form-check-label">Nome</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="documento" checked>
-                            <label class="form-check-label">Documento</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="valor_divida" checked>
-                            <label class="form-check-label">Valor</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="data_vencimento">
-                            <label class="form-check-label">Vencimento</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="status">
-                            <label class="form-check-label">Status</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="tipo_pessoa">
-                            <label class="form-check-label">Tipo Pessoa</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input coluna-opt" type="checkbox" value="endereco">
-                            <label class="form-check-label">Endereço</label>
+                        <div id="opcoes-campos">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input coluna-opt" type="checkbox" value="nome" checked>
+                                <label class="form-check-label">Nome</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input coluna-opt" type="checkbox" value="documento" checked>
+                                <label class="form-check-label">Documento</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input coluna-opt" type="checkbox" value="valor_divida" checked>
+                                <label class="form-check-label">Valor</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input coluna-opt" type="checkbox" value="data_vencimento">
+                                <label class="form-check-label">Vencimento</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input coluna-opt" type="checkbox" value="status">
+                                <label class="form-check-label">Status</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input coluna-opt" type="checkbox" value="tipo_pessoa">
+                                <label class="form-check-label">Tipo Pessoa</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input coluna-opt" type="checkbox" value="endereco">
+                                <label class="form-check-label">Endereço</label>
+                            </div>
                         </div>
                     </div>
                     <div class="col-12 no-print">
@@ -61,82 +65,98 @@
                 </div>
             </div>
         </div>
+    </div>
 
-        <div id="resultado" class="mt-5"></div>
+    <div class="modal fade" id="modalResultado" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title" id="modalLabel">DADOS SMART - RELATÓRIO OFICIAL</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="corpoModal">
+                    </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Sair</button>
+                    <button type="button" onclick="baixarPDF()" class="btn btn-danger">Baixar PDF</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        // Pega os campos marcados pelo usuário
+        let meuModal;
+        document.addEventListener('DOMContentLoaded', function() {
+            // Inicializa o modal corretamente
+            meuModal = new bootstrap.Modal(document.getElementById('modalResultado'));
+        });
+
         function getCamposSelecionados() {
             const checkboxes = document.querySelectorAll('.coluna-opt:checked');
             return Array.from(checkboxes).map(cb => cb.value).join(',');
         }
 
         async function consultar(event) {
-            // Impede o comportamento padrão de recarregar a página
-            if (event) event.preventDefault();
+    // 1. IMPEDE O REFRESH DA PÁGINA
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
 
-            const inputDoc = document.getElementById('documento');
-            const doc = inputDoc.value;
+    const inputDoc = document.getElementById('documento');
+    const doc = inputDoc.value;
 
-            if (!doc) { 
-                alert("Informe um documento."); 
-                return false; 
-            }
+    if (!doc) { 
+        alert("Informe um documento."); 
+        return false; 
+    }
 
-            const campos = getCamposSelecionados();
+    const campos = getCamposSelecionados();
 
-            try {
-                const response = await fetch(`http://127.0.0.1:8000/gerar-relatorio?documento=${doc}&campos_selecionados=${campos}`);
-                
-                if (!response.ok) {
-                    throw new Error('Erro na resposta do servidor');
-                }
+    try {
+        const response = await fetch(`http://127.0.0.1:8000/gerar-relatorio?documento=${doc}&campos_selecionados=${campos}`);
+        
+        if (!response.ok) throw new Error('Erro na resposta do servidor');
 
-                const dados = await response.json();
+        const dados = await response.json();
 
-                // Monta o HTML da tabela
-                let html = `
-                    <div class="report-header">
-                        <h3>DADOS SMART - RELATÓRIO OFICIAL</h3>
-                    </div>
-                    <table class="table table-bordered mt-3 bg-white">
-                        <thead class="table-dark">
-                            <tr>`;
-                
-                Object.keys(dados).forEach(key => {
-                    html += `<th class="text-capitalize">${key.replace('_', ' ')}</th>`;
-                });
-                
-                html += `</tr></thead><tbody><tr>`;
-                
-                Object.values(dados).forEach(val => {
-                    if (typeof val === 'number' && !isNaN(val)) {
-                        val = val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                    }
-                    html += `<td>${val}</td>`;
-                });
+        // 2. MONTA O CONTEÚDO
+        let html = `
+            <div class="mb-3"><strong>Documento Consultado:</strong> ${doc}</div>
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped bg-white">
+                    <thead class="table-dark"><tr>`;
+        
+        Object.keys(dados).forEach(key => {
+            html += `<th class="text-capitalize">${key.replace('_', ' ')}</th>`;
+        });
+        
+        html += `</tr></thead><tbody><tr>`;
+        
+        Object.values(dados).forEach(val => {
+            html += `<td>${val}</td>`;
+        });
 
-                html += `</tr></tbody></table>`;
+        html += `</tr></tbody></table></div>`;
 
-                // Insere o resultado na div
-                const divResultado = document.getElementById('resultado');
-                divResultado.innerHTML = html;
-                
-                console.log("Tabela gerada com sucesso!");
-
-            } catch (error) {
-                console.error("Erro detalhado:", error);
-                alert("Erro ao conectar com o servidor. Verifique se o Python está rodando.");
-            }
-
-            return false;
-        }
+        // 3. INJETA E MOSTRA (SÓ AGORA)
+        document.getElementById('corpoModal').innerHTML = html;
+        
+        // Aqui está o segredo: o modal só abre se os dados chegarem e a página não cair
+        meuModal.show();
+        
+    } catch (error) {
+        console.error("Erro:", error);
+        alert("Erro ao conectar com o servidor.");
+    }
+    
+    // 4. BLOQUEIO ADICIONAL
+    return false;
+}
 
         function baixarPDF() {
             const doc = document.getElementById('documento').value;
             if (!doc) { alert("Informe um CPF ou CNPJ."); return; }
-            
             const campos = getCamposSelecionados();
             window.open(`http://127.0.0.1:8000/gerar-pdf?documento=${doc}&campos_selecionados=${campos}`, '_blank');
         }
