@@ -15,6 +15,8 @@ import random
 from datetime import datetime
 
 app = FastAPI(title="Dados Smart - Integrador")
+
+# Configuração de Criptografia
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app.add_middleware(
@@ -37,9 +39,11 @@ def enviar_email_real(destinatario, codigo, assunto="Código de Verificação - 
     msg['To'] = destinatario
 
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(remetente, senha)
-            server.sendmail(remetente, destinatario, msg.as_string())
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls() 
+        server.login(remetente, senha)
+        server.sendmail(remetente, destinatario, msg.as_string())
+        server.quit()
         return True
     except Exception as e:
         print(f"Erro ao enviar e-mail: {e}")
@@ -56,16 +60,17 @@ def validar_senha(senha: str):
 # --- ROTAS DE AUTENTICAÇÃO ---
 @app.post("/auth/cadastrar")
 async def cadastrar(dados: dict = Body(...)):
+    # Valida a complexidade antes de truncar
     if not validar_senha(dados['senha']):
         raise HTTPException(status_code=400, detail="Senha fraca: use 8+ caracteres, maiúsculas, minúsculas, números e símbolos.")
     
     codigo = str(random.randint(100000, 999999))
-    conn = None # Inicializa a variável como None
+    conn = None 
 
     try:
-        senha_hash = pwd_context.hash(dados['senha'])
+        # AJUSTE: Truncar para 72 bytes para evitar erro do bcrypt
+        senha_hash = pwd_context.hash(dados['senha'][:72])
         
-        # Tenta enviar o e-mail, mas não trava o processo se falhar
         destinatario_usuario = dados.get('email')
         if not enviar_email_real(destinatario_usuario, codigo, "Ative sua conta - Dados Smart"):
             print(f"--- FALHA NO SMTP. CÓDIGO NO TERMINAL: {codigo} ---")
@@ -81,9 +86,9 @@ async def cadastrar(dados: dict = Body(...)):
         raise HTTPException(status_code=400, detail="Matrícula, CPF ou E-mail já cadastrados.")
     except Exception as e:
         print(f"Erro interno: {e}")
-        raise HTTPException(status_code=500, detail="Erro interno no servidor.")
+        raise HTTPException(status_code=500, detail=f"Erro interno no servidor: {str(e)}")
     finally:
-        if conn: # Só tenta fechar se a conexão foi aberta
+        if conn:
             conn.close()
             
 @app.post("/auth/login")
@@ -94,7 +99,8 @@ async def login(dados: dict = Body(...)):
     user = cursor.fetchone()
     conn.close()
 
-    if user and pwd_context.verify(dados['senha'], user[0]):
+    # AJUSTE: Truncar a senha no login também para bater com o hash do cadastro
+    if user and pwd_context.verify(dados['senha'][:72], user[0]):
         hoje = datetime.now().strftime("%m-%d")
         try:
             aniv = datetime.strptime(user[2], "%Y-%m-%d").strftime("%m-%d") if user[2] else ""
@@ -102,5 +108,3 @@ async def login(dados: dict = Body(...)):
             aniv = ""
         return {"status": "sucesso", "nome": user[1], "aniversario": (hoje == aniv), "msg": "Bem vindo ao sistema!"}
     raise HTTPException(status_code=401, detail="Credenciais incorretas ou conta inativa.")
-
-# (Manter rotas de relatórios e PDF originais abaixo)
