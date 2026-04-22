@@ -45,7 +45,7 @@
                     </div>
                 </div>
                 <div class="col-12">
-                    <button type="button" onclick="consultar()" class="btn btn-success me-2">Visualizar Tabela</button>
+                    <button type="button" id="btnConsultar" onclick="consultar()" class="btn btn-success me-2">Visualizar Tabela</button>
                     <button type="button" onclick="baixarPDF()" class="btn btn-danger">Gerar PDF</button>
                 </div>
             </form>
@@ -82,7 +82,13 @@ document.addEventListener('DOMContentLoaded', () => {
 async function consultar() {
     const doc = document.getElementById('documento').value;
     const tipo = document.getElementById('tipoPesquisa').value;
+    const btn = document.getElementById('btnConsultar');
+
     if (!doc) return alert("Insira um número para pesquisa.");
+
+    // Feedback Visual
+    btn.disabled = true;
+    btn.innerText = "Consultando...";
 
     try {
         const res = await fetch(`${API_URL}/consultar?documento=${doc}&tipo=${tipo}`);
@@ -93,7 +99,12 @@ async function consultar() {
         } else {
             alert("Erro: " + (dados.detail || "Falha na consulta"));
         }
-    } catch (e) { alert("Erro de conexão com o servidor."); }
+    } catch (e) { 
+        alert("Erro de conexão com o servidor."); 
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Visualizar Tabela";
+    }
 }
 
 function renderizarTabela(dados) {
