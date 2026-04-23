@@ -1,34 +1,60 @@
 import requests
 
+# Sua chave de API do CPFhub.io (conforme documentação de 2026)
+API_TOKEN_CPFHUB = "2e8d63a30a8aa06092b6fad5bc02d7d4a9782bc704d578f9433635022b5119e6"
+
 def buscar_dados_reais(documento):
-    # Remove qualquer caractere que não seja número (espaços, pontos, traços)
+    # Remove qualquer caractere que não seja número
     doc_limpo = "".join(filter(str.isdigit, documento))
     
-    # A BrasilAPI requer exatamente 14 dígitos para busca de CNPJ
+    # --- LÓGICA PARA CNPJ (14 dígitos) via BrasilAPI ---
     if len(doc_limpo) == 14:
         url = f"https://brasilapi.com.br/api/cnpj/v1/{doc_limpo}"
-    else:
-        # Se for CPF ou outro formato, a integração atual retorna None
-        return None
+        try:
+            response = requests.get(url, timeout=15)
+            if response.status_code == 200:
+                dados_api = response.json()
+                return {
+                    "nome": dados_api.get("razao_social", "Nada Consta"),
+                    "documento": documento,
+                    "exercicio": "2024", 
+                    "valor_divida": "0,00", 
+                    "status": dados_api.get("descricao_situacao_cadastral", "Nada Consta"),
+                    "estornado": "Não",
+                    "endereco": f"{dados_api.get('municipio', 'Nada Consta')}, {dados_api.get('uf', 'Nada Consta')}"
+                }
+        except Exception as e:
+            print(f"Erro na conexão com a API CNPJ: {e}")
 
-    try:
-        # Chamada real para a API externa
-        response = requests.get(url, timeout=15)
-        if response.status_code == 200:
-            dados_api = response.json()
-            # Mapeia os campos da BrasilAPI para o formato do seu sistema
-            return {
-                "nome": dados_api.get("razao_social", "Nada Consta"),
-                "documento": documento,
-                "exercicio": "2024", 
-                "valor_divida": "0,00", 
-                "status": dados_api.get("descricao_situacao_cadastral", "Nada Consta"),
-                "estornado": "Não",
-                "endereco": f"{dados_api.get('municipio', 'Nada Consta')}, {dados_api.get('uf', 'Nada Consta')}"
-            }
-        else:
-            print(f"API retornou erro {response.status_code} para o documento {doc_limpo}")
-    except Exception as e:
-        print(f"Erro na conexão com a API: {e}")
+    # --- LÓGICA PARA CPF (11 dígitos) via CPFHub.io ---
+    elif len(doc_limpo) == 11:
+        # URL e headers atualizados conforme documentação oficial
+        url = f"https://api.cpfhub.io/cpf/{doc_limpo}" 
+        headers = {
+            'x-api-key': API_TOKEN_CPFHUB,
+            'Accept': 'application/json'
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, timeout=15)
+            if response.status_code == 200:
+                resposta = response.json()
+                if resposta.get("success"):
+                    dados = resposta.get("data", {})
+                    return {
+                        "nome": dados.get("name", "Nome não disponível"),
+                        "documento": documento,
+                        "exercicio": "2024",
+                        "valor_divida": "0,00",
+                        "status": "REGULAR", # Status padrão para consultas bem-sucedidas
+                        "estornado": "Não",
+                        "endereco": f"Nascido em: {dados.get('birthDate', 'N/A')}" # Usando campo birthDate da API
+                    }
+            elif response.status_code == 401:
+                print("Erro: Chave de API (x-api-key) inválida ou expirada.")
+            else:
+                print(f"CPFhub retornou erro {response.status_code}")
+        except Exception as e:
+            print(f"Erro na conexão com a API CPFhub: {e}")
     
     return None
