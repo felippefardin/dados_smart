@@ -1,19 +1,22 @@
 import requests
 
 def buscar_dados_reais(documento):
-    # Garante que apenas números sejam enviados, removendo espaços, pontos ou traços
+    # Remove qualquer caractere que não seja número (espaços, pontos, traços)
     doc_limpo = "".join(filter(str.isdigit, documento))
     
-    # BrasilAPI exige 14 dígitos para CNPJ
+    # A BrasilAPI requer exatamente 14 dígitos para busca de CNPJ
     if len(doc_limpo) == 14:
         url = f"https://brasilapi.com.br/api/cnpj/v1/{doc_limpo}"
     else:
+        # Se for CPF ou outro formato, a integração atual retorna None
         return None
 
     try:
-        response = requests.get(url, timeout=15) # Aumentado o timeout para conexões lentas
+        # Chamada real para a API externa
+        response = requests.get(url, timeout=15)
         if response.status_code == 200:
             dados_api = response.json()
+            # Mapeia os campos da BrasilAPI para o formato do seu sistema
             return {
                 "nome": dados_api.get("razao_social", "Nada Consta"),
                 "documento": documento,
