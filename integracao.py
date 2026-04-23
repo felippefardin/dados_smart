@@ -1,9 +1,13 @@
 import requests
+from datetime import datetime
 
 # Sua chave de API do CPFhub.io (conforme documentação de 2026)
 API_TOKEN_CPFHUB = "2e8d63a30a8aa06092b6fad5bc02d7d4a9782bc704d578f9433635022b5119e6"
 
 def buscar_dados_reais(documento):
+    # Obtém o ano atual dinamicamente
+    ano_atual = str(datetime.now().year)
+    
     # Remove qualquer caractere que não seja número
     doc_limpo = "".join(filter(str.isdigit, documento))
     
@@ -17,7 +21,8 @@ def buscar_dados_reais(documento):
                 return {
                     "nome": dados_api.get("razao_social", "Nada Consta"),
                     "documento": documento,
-                    "exercicio": "2024", 
+                    "data_nascimento": "N/A (Empresa)",
+                    "exercicio": ano_atual, # Ano dinâmico aplicado aqui
                     "valor_divida": "0,00", 
                     "status": dados_api.get("descricao_situacao_cadastral", "Nada Consta"),
                     "estornado": "Não",
@@ -28,7 +33,6 @@ def buscar_dados_reais(documento):
 
     # --- LÓGICA PARA CPF (11 dígitos) via CPFHub.io ---
     elif len(doc_limpo) == 11:
-        # URL e headers atualizados conforme documentação oficial
         url = f"https://api.cpfhub.io/cpf/{doc_limpo}" 
         headers = {
             'x-api-key': API_TOKEN_CPFHUB,
@@ -44,16 +48,15 @@ def buscar_dados_reais(documento):
                     return {
                         "nome": dados.get("name", "Nome não disponível"),
                         "documento": documento,
-                        "exercicio": "2024",
+                        "data_nascimento": dados.get("birthDate", "N/A"),
+                        "exercicio": ano_atual, # Ano dinâmico aplicado aqui
                         "valor_divida": "0,00",
-                        "status": "REGULAR", # Status padrão para consultas bem-sucedidas
+                        "status": "REGULAR",
                         "estornado": "Não",
-                        "endereco": f"Nascido em: {dados.get('birthDate', 'N/A')}" # Usando campo birthDate da API
+                        "endereco": "Consulta via CPFhub"
                     }
             elif response.status_code == 401:
-                print("Erro: Chave de API (x-api-key) inválida ou expirada.")
-            else:
-                print(f"CPFhub retornou erro {response.status_code}")
+                print("Erro: Chave de API inválida.")
         except Exception as e:
             print(f"Erro na conexão com a API CPFhub: {e}")
     

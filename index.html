@@ -7,117 +7,218 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap');
+
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3f37c9;
+            --success-color: #4cc9f0;
+            --bg-gradient: linear-gradient(135deg, #f8f9ff 0%, #e0e7ff 100%);
+        }
 
         body { 
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: var(--bg-gradient);
             min-height: 100vh;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            color: #2b2d42;
         }
 
         @media print { .no-print { display: none !important; } }
         
-        .search-card { border: none; border-radius: 15px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
-        
-        /* Grid de Opções Estilizado */
+        /* Glassmorphism Card */
+        .search-card { 
+            border: none; 
+            border-radius: 24px; 
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.05); 
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .card-header {
+            background: transparent !important;
+            border-bottom: 1px solid #edf2f7 !important;
+            padding: 1.5rem !important;
+        }
+
+        .card-header h4 {
+            color: var(--primary-color);
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        /* Input styling */
+        .form-control, .form-select {
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            border: 1px solid #d1d5db;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus, .form-select:focus {
+            box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.15);
+            border-color: var(--primary-color);
+        }
+
+        /* Grid de Opções Modernizado */
         .opcoes-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 12px;
-            background: #ffffff;
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid #dee2e6;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+            background: #fcfcfd;
+            padding: 24px;
+            border-radius: 20px;
+            border: 1px solid #f1f5f9;
         }
 
         .coluna-item {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #eee;
-            transition: 0.2s;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 14px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
             display: flex;
             align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
 
-        .coluna-item:hover { background: #e9ecef; border-color: #0d6efd; }
+        .coluna-item:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+            border-color: var(--primary-color);
+        }
 
-        /* Modal Full Screen */
-        .modal-xl { max-width: 98vw; margin: 10px auto; }
-        .modal-body { padding: 0; }
-        .table-responsive { max-height: 80vh; width: 100%; }
+        .form-check-input {
+            width: 1.2rem;
+            height: 1.2rem;
+            margin-top: 0;
+            cursor: pointer;
+        }
+
+        .form-check-input:checked {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        /* Buttons */
+        .btn {
+            border-radius: 12px;
+            padding: 0.8rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-success { background-color: var(--primary-color); border: none; }
+        .btn-success:hover { background-color: var(--secondary-color); transform: translateY(-1px); }
         
-        table { margin-bottom: 0 !important; white-space: nowrap; }
-        thead { background-color: #212529; color: white; }
+        .btn-danger { background-color: #ef4444; border: none; }
+        .btn-danger:hover { background-color: #dc2626; }
 
-        @media (max-width: 576px) {
-            .btn-group-mobile { display: flex; flex-direction: column; gap: 10px; }
-            .btn-group-mobile .btn { width: 100%; }
+        /* Modal Layout */
+        .modal-content { border-radius: 24px; border: none; }
+        .modal-header { border-bottom: 1px solid #f1f5f9; padding: 1.5rem; }
+        .modal-footer { border-top: 1px solid #f1f5f9; padding: 1.2rem; }
+
+        .table-responsive { 
+            max-height: 70vh; 
+            border-radius: 0 0 20px 20px;
         }
+
+        table { font-size: 0.95rem; }
+        thead th { 
+            background-color: #f8fafc !important; 
+            color: #64748b !important;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            padding: 1rem !important;
+            border-bottom: 2px solid #e2e8f0 !important;
+        }
+
+        tbody td { padding: 1rem !important; vertical-align: middle; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
-<body class="bg-light">
+<body>
 
-<div class="container mt-5">
-    <div class="card shadow search-card no-print mb-4">
-        <div class="card-header bg-primary text-white p-3">
-            <h4 class="mb-0"><i class="bi bi-search me-2"></i>Gerador de Relatórios Consolidados</h4>
+<div class="container py-5">
+    <div class="text-center mb-5 no-print">
+        <h2 class="fw-bold" style="color: #1e293b;">Dados Smart</h2>
+        <p class="text-muted">Gestão Inteligente de Dados e Tributos</p>
+    </div>
+
+    <div class="card search-card no-print">
+        <div class="card-header">
+            <h4 class="mb-0"><i class="bi bi-filter-right me-2"></i>Gerador de Relatórios Consolidados</h4>
         </div>
-        <div class="card-body p-4">
-            <form id="formConsulta" class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label fw-bold text-secondary">Tipo de Pesquisa:</label>
-                    <select id="tipoPesquisa" class="form-select border-primary shadow-sm">
+        <div class="card-body p-lg-5">
+            <form id="formConsulta" class="row g-4">
+                <div class="col-md-5">
+                    <label class="form-label fw-600 text-muted small text-uppercase">Tipo de Pesquisa</label>
+                    <select id="tipoPesquisa" class="form-select shadow-sm">
                         <option value="documento">CPF / CNPJ</option>
                         <option value="cda">Número da CDA</option>
                     </select>
                 </div>
-                <div class="col-md-8">
-                    <label class="form-label fw-bold text-secondary">Identificador (Número):</label>
-                    <input type="text" id="documento" class="form-control border-primary shadow-sm" placeholder="Digite apenas números">
+                <div class="col-md-7">
+                    <label class="form-label fw-600 text-muted small text-uppercase">Identificador (Apenas números)</label>
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-white border-end-0 rounded-start-3"><i class="bi bi-hash text-primary"></i></span>
+                        <input type="text" id="documento" class="form-control border-start-0" placeholder="000.000.000-00">
+                    </div>
                 </div>
                 
                 <div class="col-12">
-                    <h6 class="fw-bold text-secondary mt-3">Campos para o Relatório:</h6>
+                    <h6 class="fw-600 text-muted small text-uppercase mt-3 mb-3">Campos Visíveis no Relatório</h6>
                     <div id="opcoes-campos" class="opcoes-grid shadow-sm">
                         <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-2" type="checkbox" value="nome" id="f_nome" checked>
+                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="nome" checked>
                             <span>Nome</span>
                         </label>
                         <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-2" type="checkbox" value="documento" id="f_doc" checked>
+                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="documento" checked>
                             <span>Documento</span>
                         </label>
                         <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-2" type="checkbox" value="exercicio" id="f_exe" checked>
+                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="data_nascimento" checked>
+                            <span>Nascimento</span>
+                        </label>
+                        <label class="coluna-item">
+                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="exercicio" checked>
                             <span>Exercício</span>
                         </label>
                         <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-2" type="checkbox" value="valor_divida" id="f_val" checked>
+                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="valor_divida" checked>
                             <span>Valor</span>
                         </label>
                         <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-2" type="checkbox" value="status" id="f_sta" checked>
+                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="status" checked>
                             <span>Status</span>
                         </label>
                         <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-2" type="checkbox" value="estornado" id="f_est" checked>
+                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="estornado" checked>
                             <span>Estornado</span>
                         </label>
                         <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-2" type="checkbox" value="endereco" id="f_end" checked>
+                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="endereco" checked>
                             <span>Endereço</span>
                         </label>
                     </div>
                 </div>
 
-                <div class="col-12 btn-group-mobile mt-4">
-                    <button type="button" id="btnConsultar" onclick="consultar()" class="btn btn-success me-md-2 px-4 fw-bold shadow-sm">
-                        <i class="bi bi-table me-1"></i> Visualizar Tabela
+                <div class="col-12 d-flex flex-wrap gap-3 mt-5">
+                    <button type="button" id="btnConsultar" onclick="consultar()" class="btn btn-success shadow">
+                        <i class="bi bi-lightning-charge-fill me-2"></i>Visualizar Tabela
                     </button>
-                    <button type="button" onclick="baixarPDF()" class="btn btn-danger px-4 fw-bold shadow-sm">
-                        <i class="bi bi-file-pdf me-1"></i> Gerar PDF
+                    <button type="button" onclick="baixarPDF()" class="btn btn-danger shadow">
+                        <i class="bi bi-file-earmark-pdf-fill me-2"></i>Gerar PDF
                     </button>
                 </div>
             </form>
@@ -127,18 +228,22 @@
 
 <div class="modal fade" id="modalResultado" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title font-weight-bold">Relatório de Consulta Smart</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-content shadow-2xl">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title fw-bold mb-0">Relatório Consolidado</h5>
+                    <small class="text-muted">Resultados da integração Dados Smart</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-0">
-                <div class="table-responsive" id="conteudoTabela"></div>
+            <div class="modal-body">
+                <div class="table-responsive" id="conteudoTabela">
+                    </div>
             </div>
             <div class="modal-footer bg-light no-print">
-                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Fechar</button>
-                <button type="button" class="btn btn-primary fw-bold" onclick="window.print()">
-                    <i class="bi bi-printer me-1"></i> Imprimir
+                <button type="button" class="btn btn-link text-muted text-decoration-none fw-bold" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary shadow-sm px-4" onclick="window.print()">
+                    <i class="bi bi-printer me-2"></i>Imprimir Relatório
                 </button>
             </div>
         </div>
@@ -158,59 +263,49 @@ async function consultar() {
     const doc = document.getElementById('documento').value;
     const tipo = document.getElementById('tipoPesquisa').value;
     const btn = document.getElementById('btnConsultar');
-
-    if (!doc) return alert("Insira um número para pesquisa.");
+    if (!doc) return alert("Por favor, insira um número para pesquisa.");
 
     btn.disabled = true;
-    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Consultando...`;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Processando...`;
 
     try {
         const res = await fetch(`${API_URL}/consultar?documento=${doc}&tipo=${tipo}`);
         const dados = await res.json();
-        
         if (res.ok) {
             renderizarTabela(dados);
             bootstrapModal.show();
         } else {
-            alert("Erro: " + (dados.detail || "Falha na consulta"));
+            alert("Erro: " + (dados.detail || "Falha na comunicação com o servidor"));
         }
     } catch (e) { 
-        alert("Erro de conexão com o servidor."); 
+        alert("Erro crítico: Verifique se o servidor backend está rodando."); 
     } finally {
         btn.disabled = false;
-        btn.innerHTML = `<i class="bi bi-table me-1"></i> Visualizar Tabela`;
+        btn.innerHTML = `<i class="bi bi-lightning-charge-fill me-2"></i>Visualizar Tabela`;
     }
 }
 
 function renderizarTabela(dados) {
     const conteudo = document.getElementById('conteudoTabela');
     const checkboxes = document.querySelectorAll('.coluna-opt:checked');
-    
-    // Mapeia colunas selecionadas
-    const colunas = Array.from(checkboxes).map(cb => ({
-        id: cb.value,
-        label: cb.parentElement.querySelector('span').innerText
+    const colunas = Array.from(checkboxes).map(cb => ({ 
+        id: cb.value, 
+        label: cb.parentElement.querySelector('span').innerText 
     }));
 
-    // Cria tabela garantindo largura total
-    let html = `<table class="table table-bordered table-striped table-hover w-100 align-middle">
-                <thead><tr>`;
+    let html = `<table class="table table-hover align-middle mb-0"><thead><tr>`;
     colunas.forEach(col => html += `<th>${col.label}</th>`);
     html += `</tr></thead><tbody>`;
 
-    // Garante que 'dados' seja tratado como lista (array)
     const listaResultados = Array.isArray(dados) ? dados : [dados];
-
     listaResultados.forEach(item => {
         html += `<tr>`;
         colunas.forEach(col => {
-            // Busca o dado usando a chave definida no Python (ex: item['nome'])
-            let valor = item[col.id] || "Nada Consta";
+            let valor = item[col.id] || `<span class="text-muted italic small">N/A</span>`;
             html += `<td>${valor}</td>`;
         });
         html += `</tr>`;
     });
-
     html += `</tbody></table>`;
     conteudo.innerHTML = html;
 }
@@ -218,7 +313,7 @@ function renderizarTabela(dados) {
 function baixarPDF() {
     const doc = document.getElementById('documento').value;
     const tipo = document.getElementById('tipoPesquisa').value;
-    if (!doc) return alert("Digite um identificador.");
+    if (!doc) return alert("Digite um identificador válido antes de gerar o PDF.");
     window.open(`${API_URL}/gerar-pdf/${doc}?tipo=${tipo}`, '_blank');
 }
 </script>
