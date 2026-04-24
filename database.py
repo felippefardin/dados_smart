@@ -1,6 +1,7 @@
 import sqlite3
 
 def criar_banco():
+    # Conecta ao arquivo de banco de dados
     conn = sqlite3.connect('dados_smart.db')
     cursor = conn.cursor()
     
@@ -20,11 +21,14 @@ def criar_banco():
         )
     ''')
     
+    # Tabela de Logs atualizada com múltiplos exercícios e endereço
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS logs_consulta (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             usuario TEXT,
             cpf_consultado TEXT,
+            exercicios_consultados TEXT, -- Campo para salvar a lista de anos (ex: 2023, 2024)
+            endereco_retornado TEXT,      -- Campo para salvar o endereço detalhado da consulta
             data_hora DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -33,5 +37,5 @@ def criar_banco():
     conn.close()
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    criar_banco()
+    print("Banco de dados e tabelas configurados com sucesso.")

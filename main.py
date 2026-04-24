@@ -1,9 +1,12 @@
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from typing import List, Optional
 import pdfkit
+import os
 from datetime import datetime
 from integracao import buscar_dados_reais
+
 
 app = FastAPI(title="Dados Smart - Integrador")
 
@@ -16,18 +19,21 @@ app.add_middleware(
 )
 
 @app.get("/consultar")
-async def consultar_documento(documento: str = Query(...), tipo: str = Query("documento")):
-    # Tenta buscar os dados reais primeiro
-    dados = buscar_dados_reais(documento)
+async def consultar_documento(
+    documento: str = Query(...), 
+    tipo: str = Query("documento"),
+    exercicio: Optional[List[str]] = Query(None) # Permite múltiplos como ?exercicio=2023&exercicio=2024
+):
+    # Passa a lista de exercícios para a integração
+    dados = buscar_dados_reais(documento, exercicio)
     
     if dados:
         return dados
 
-    # Se não encontrar na API, retorna o objeto com status informativo
     return {
         "nome": "Não Localizado",
         "documento": documento,
-        "exercicio": "N/A",
+        "exercicio": ", ".join(exercicio) if exercicio else "N/A",
         "valor_divida": "0,00",
         "status": "Não Encontrado na API",
         "estornado": "N/A",
@@ -35,8 +41,8 @@ async def consultar_documento(documento: str = Query(...), tipo: str = Query("do
     }
 
 @app.get("/gerar-pdf/{documento}")
-async def gerar_pdf_rota(documento: str, tipo: str = Query("documento")):
-    dados = await consultar_documento(documento, tipo)
+async def gerar_pdf_rota(documento: str, exercicio: Optional[List[str]] = Query(None)):
+    dados = await consultar_documento(documento, "documento", exercicio)
     
     html_template = f"""
     <html>
@@ -47,8 +53,8 @@ async def gerar_pdf_rota(documento: str, tipo: str = Query("documento")):
             <hr>
             <p><strong>Nome:</strong> {dados.get('nome')}</p>
             <p><strong>Documento:</strong> {dados.get('documento')}</p>
-            <p><strong>Exercício:</strong> {dados.get('exercicio')}</p>
-            <p><strong>Valor:</strong> R$ {dados.get('valor_divida')}</p>
+            <p><strong>Exercícios Consultados:</strong> {dados.get('exercicio')}</p>
+            <p><strong>Valor Total:</strong> R$ {dados.get('valor_divida')}</p>
             <p><strong>Status:</strong> {dados.get('status')}</p>
             <p><strong>Estornado:</strong> {dados.get('estornado')}</p>
             <p><strong>Endereço:</strong> {dados.get('endereco')}</p>
@@ -65,5 +71,10 @@ async def gerar_pdf_rota(documento: str, tipo: str = Query("documento")):
         config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
         pdfkit.from_string(html_template, path_pdf, configuration=config)
         return FileResponse(path_pdf, media_type='application/pdf', filename=path_pdf)
-    except Exception:
+    except Exception as e:
+        print(f"Erro PDF: {e}")
         raise HTTPException(status_code=500, detail="Erro ao gerar PDF.")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
