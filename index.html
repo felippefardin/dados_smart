@@ -109,7 +109,7 @@
             transition: all 0.3s ease;
         }
 
-        .btn-success { background-color: var(--primary-color); border: none; }
+        .btn-success { background-color: #198754; border: none; } 
         .btn-success:hover { background-color: var(--secondary-color); transform: translateY(-1px); }
         
         .btn-danger { background-color: #ef4444; border: none; }
@@ -214,13 +214,13 @@
                 </div>
 
                 <div class="col-12 d-flex flex-wrap gap-3 mt-5">
-                    <button type="button" id="btnConsultar" onclick="consultar()" class="btn btn-success shadow">
+                    <button type="button" id="btnConsultar" onclick="consultar()" class="btn btn-primary shadow">
                         <i class="bi bi-lightning-charge-fill me-2"></i>Visualizar Tabela
                     </button>
                     <button type="button" onclick="baixarPDF()" class="btn btn-danger shadow">
                         <i class="bi bi-file-earmark-pdf-fill me-2"></i>Gerar PDF
                     </button>
-                    <button type="button" onclick="baixarExcel()" class="btn btn-primary shadow">
+                    <button type="button" onclick="baixarExcel()" class="btn btn-success shadow">
                         <i class="bi bi-file-earmark-excel-fill me-2"></i>Gerar Excel
                     </button>
                 </div>
