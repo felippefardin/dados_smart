@@ -83,26 +83,24 @@ async def gerar_excel_rota(
     tipo: Optional[str] = Query(None), 
     exercicio: Optional[List[str]] = Query(None)
 ):
-    # 1. Busca os dados reais (igual ao PDF)
+    # 1. Busca os dados reais
     dados = await consultar_documento(documento=documento, tipo=tipo or "documento", exercicio=exercicio)
     
-    # 2. Transforma em DataFrame do Pandas
-    df = pd.DataFrame([dados])
-    
-    # 3. Mapeia os nomes das colunas para ficarem amigáveis no Excel
-    colunas_map = {
-        "nome": "Nome/Razão Social",
-        "documento": "CPF/CNPJ",
-        "data_nascimento": "Data de Nascimento",
-        "exercicio": "Exercícios",
-        "valor_divida": "Valor da Dívida (R$)",
-        "status": "Situação/Status",
-        "estornado": "Estornado",
-        "endereco": "Endereço Completo"
+    # 2. Garante que todos os campos existam para o DataFrame não vir vazio
+    # Isso resolve o problema de campos "faltando" no Excel
+    registro = {
+        "Nome/Razão Social": dados.get("nome", "N/A"),
+        "CPF/CNPJ": dados.get("documento", documento),
+        "Data de Nascimento": dados.get("data_nascimento", "N/A"),
+        "Exercícios": dados.get("exercicio", "N/A"),
+        "Endereço Completo": dados.get("endereco", "N/A"),
+        "Valor da Dívida (R$)": dados.get("valor_divida", "0,00"),
+        "Situação/Status": dados.get("status", "N/A"),
+        "Estornado": dados.get("estornado", "Não")
     }
     
-    # Renomeia apenas as colunas que existem no resultado
-    df = df.rename(columns={k: v for k, v in colunas_map.items() if k in df.columns})
+    # 3. Transforma em DataFrame
+    df = pd.DataFrame([registro])
 
     # 4. Gera o arquivo em memória
     output = BytesIO()
@@ -123,7 +121,7 @@ async def gerar_pdf_rota(documento: str, tipo: Optional[str] = Query(None), exer
     
     endereco_final = dados.get('endereco') or "Não informado"
 
-    html_template = f"""
+   html_template = f"""
     <html>
         <head>
             <meta charset="UTF-8">
