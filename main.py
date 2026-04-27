@@ -6,7 +6,9 @@ import pdfkit
 import os
 from datetime import datetime
 from integracao import buscar_dados_reais
-
+import pandas as pd
+from io import BytesIO
+from fastapi.responses import StreamingResponse
 
 app = FastAPI(title="Dados Smart - Integrador")
 
@@ -39,6 +41,50 @@ async def consultar_documento(
         "estornado": "N/A",
         "endereco": "N/A"
     }
+
+@app.get("/gerar-excel/{documento}")
+async def gerar_excel_rota(
+    documento: str, 
+    tipo: Optional[str] = Query(None), # Adicionado para capturar o ?tipo= enviado pelo JS
+    exercicio: Optional[List[str]] = Query(None)
+):
+    # Chamada correta da função interna
+    dados = await consultar_documento(documento=documento, tipo=tipo, exercicio=exercicio)
+    
+    # Se 'dados' for um único dicionário, transformamos em lista para o DataFrame
+    lista_dados = [dados] if isinstance(dados, dict) else dados
+    
+    # Cria o DataFrame do Pandas
+    df = pd.DataFrame(lista_dados)
+    
+    # Renomeia as colunas para um formato amigável
+    colunas_map = {
+        "nome": "Nome/Razão Social",
+        "documento": "CPF/CNPJ",
+        "exercicio": "Exercícios",
+        "valor_divida": "Valor da Dívida (R$)",
+        "status": "Situação",
+        "estornado": "Estornado",
+        "endereco": "Endereço Completo"
+    }
+    
+    # Filtra apenas as colunas que existem no dicionário para evitar erro de renomeação
+    df = df.rename(columns={k: v for k, v in colunas_map.items() if k in df.columns})
+
+    # Cria o arquivo Excel em memória
+    output = BytesIO()
+    # Certifique-se de ter instalado: pip install openpyxl
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Relatorio')
+    
+    output.seek(0)
+
+    filename = f"relatorio_{documento}.xlsx"
+    return StreamingResponse(
+        output, 
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 @app.get("/gerar-pdf/{documento}")
 async def gerar_pdf_rota(documento: str, exercicio: Optional[List[str]] = Query(None)):
@@ -78,3 +124,5 @@ async def gerar_pdf_rota(documento: str, exercicio: Optional[List[str]] = Query(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
+
+    
