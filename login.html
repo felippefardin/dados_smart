@@ -17,17 +17,17 @@
         <div class="card-body">
             <div class="mb-3">
                 <label>Matrícula PMS:</label>
-                <input type="text" id="matricula" class="form-control">
+                <input type="text" id="matricula" class="form-control" placeholder="Digite sua matrícula">
             </div>
             <div class="mb-3">
                 <label>Senha:</label>
-                <input type="password" id="senha" class="form-control">
+                <input type="password" id="senha" class="form-control" placeholder="Digite sua senha">
             </div>
             <button onclick="realizarLogin()" class="btn btn-primary w-100">Entrar</button>
             <hr>
             <div class="text-center">
-                <a href="esqueci_senha.html">Esqueci minha senha</a><br>
-                <a href="fazer_cadastro.html">Criar nova conta</a>
+                <a href="esqueci_senha.html" class="text-decoration-none">Esqueci minha senha</a><br>
+                <a href="fazer_cadastro.html" class="text-decoration-none">Criar nova conta</a>
             </div>
         </div>
     </div>
@@ -39,12 +39,20 @@
                             ${msg} <button class="btn-close" data-bs-dismiss="alert"></button>
                           </div>`;
             document.getElementById('notificacoes').innerHTML += html;
-            setTimeout(() => { document.getElementById(id)?.remove(); }, 3000);
+            setTimeout(() => { 
+                const el = document.getElementById(id);
+                if(el) el.remove(); 
+            }, 3000);
         }
 
         async function realizarLogin() {
             const matricula = document.getElementById('matricula').value;
             const senha = document.getElementById('senha').value;
+
+            if (!matricula || !senha) {
+                avisar("Preencha todos os campos.", "warning");
+                return;
+            }
 
             try {
                 const res = await fetch("http://127.0.0.1:8000/auth/login", {
@@ -52,22 +60,32 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({matricula, senha})
                 });
+                
                 const dados = await res.json();
 
                 if (res.ok) {
-                    // SALVA A SESSÃO NO NAVEGADOR
+                    // Armazena os dados da sessão
                     sessionStorage.setItem("usuarioLogado", "true");
                     sessionStorage.setItem("nomeUsuario", dados.nome);
+                    sessionStorage.setItem("tipoUsuario", dados.tipo_usuario);
 
                     avisar(dados.msg, "success");
-                    if (dados.aniversario) {
-                        setTimeout(() => avisar(`🎂 FELIZ ANIVERSÁRIO, ${dados.nome.split(' ')[0]}! 🎂`, "warning"), 500);
-                    }
-                    setTimeout(() => { window.location.href = "index.html"; }, 3500);
+                    
+                    // Redirecionamento baseado no tipo de usuário retornado pelo servidor
+                    setTimeout(() => { 
+                        if (dados.tipo_usuario === "master") {
+                            window.location.href = "master.html";
+                        } else {
+                            window.location.href = "index.html";
+                        }
+                    }, 2000);
                 } else {
-                    avisar(dados.detail, "danger");
+                    // Exibe a mensagem de erro detalhada do servidor (ex: "Pendente de aprovação")
+                    avisar(dados.detail || "Erro ao realizar login.", "danger");
                 }
-            } catch (e) { avisar("Erro ao conectar com servidor.", "danger"); }
+            } catch (e) { 
+                avisar("Erro ao conectar com o servidor. Verifique se o backend está rodando.", "danger"); 
+            }
         }
     </script>
 </body>

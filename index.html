@@ -341,6 +341,16 @@ function baixarPDF() {
     
     window.open(url, '_blank');
 }
+
+// Bloqueia acesso sem login
+    if (!sessionStorage.getItem("usuarioLogado")) {
+        window.location.href = "login.html";
+    }
+
+    // Bloqueia acesso de usuário comum à tela Master
+    if (window.location.pathname.includes("master.html") && sessionStorage.getItem("tipoUsuario") !== "master") {
+        window.location.href = "index.html";
+    }
 </script>
 </body>
 </html>

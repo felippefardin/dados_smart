@@ -1,11 +1,10 @@
 import sqlite3
 
 def criar_banco():
-    # Conecta ao arquivo de banco de dados
     conn = sqlite3.connect('dados_smart.db')
     cursor = conn.cursor()
     
-    # Tabela de Usuários (Com matrícula PMS)
+    # Tabela Unificada de Usuários
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -13,29 +12,37 @@ def criar_banco():
             cpf TEXT UNIQUE NOT NULL,
             nome_completo TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
-            celular TEXT,
+            whatsapp TEXT,
             data_nascimento TEXT,
             senha_hash TEXT NOT NULL,
-            codigo_verificacao TEXT,
-            ativo INTEGER DEFAULT 0
+            autorizado INTEGER DEFAULT 0, -- 0: Pendente, 1: Autorizado, -1: Negado
+            tipo_usuario TEXT DEFAULT 'comum' -- 'comum' ou 'master'
         )
     ''')
     
-    # Tabela de Logs atualizada com múltiplos exercícios e endereço
+    # Tabela de Logs de Consulta
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS logs_consulta (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             usuario TEXT,
             cpf_consultado TEXT,
-            exercicios_consultados TEXT, -- Campo para salvar a lista de anos (ex: 2023, 2024)
-            endereco_retornado TEXT,      -- Campo para salvar o endereço detalhado da consulta
+            exercicios_consultados TEXT,
+            endereco_retornado TEXT,
             data_hora DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    # Criar o usuário MASTER caso não exista
+    cursor.execute("SELECT * FROM usuarios WHERE email = 'felippefardin@gmail.com'")
+    if not cursor.fetchone():
+        cursor.execute('''
+            INSERT INTO usuarios (matricula, cpf, nome_completo, email, senha_hash, autorizado, tipo_usuario)
+            VALUES ('MASTER', '00000000000', 'Felippe Master', 'felippefardin@gmail.com', 'admin123', 1, 'master')
+        ''')
 
     conn.commit()
     conn.close()
 
 if __name__ == "__main__":
     criar_banco()
-    print("Banco de dados e tabelas configurados com sucesso.")
+    print("Banco de dados configurado com sucesso.")
