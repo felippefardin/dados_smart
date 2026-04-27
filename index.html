@@ -315,23 +315,31 @@ function renderizarTabela(dados) {
 
 // Função para baixar o arquivo Excel seguindo o padrão da função baixarPDF
 function baixarExcel() {
-    const doc = document.getElementById('documento').value;
+    const docInput = document.getElementById('documento').value;
     const tipo = document.getElementById('tipoPesquisa').value;
     
-    if (!doc) return alert("Digite um identificador válido antes de gerar o Excel.");
+    if (!docInput) return alert("Por favor, insira um número para gerar o Excel.");
     
-    // Removido espaços ou caracteres especiais do documento para evitar erro de URL
-    const docLimpo = doc.replace(/\D/g, ''); 
+    // Limpeza crucial: remove tudo que não for número para não quebrar a URL
+    const docLimpo = docInput.replace(/\D/g, ''); 
 
-    // A URL deve seguir o formato /gerar-excel/VALOR
-    window.open(`${API_URL}/gerar-excel/${docLimpo}?tipo=${tipo}`, '_blank');
+    // A URL deve seguir o padrão: /gerar-excel/VALOR?tipo=VALOR
+    const url = `${API_URL}/gerar-excel/${docLimpo}?tipo=${tipo}`;
+    
+    window.open(url, '_blank');
 }
 
 function baixarPDF() {
-    const doc = document.getElementById('documento').value;
+    const docInput = document.getElementById('documento').value;
     const tipo = document.getElementById('tipoPesquisa').value;
-    if (!doc) return alert("Digite um identificador válido antes de gerar o PDF.");
-    window.open(`${API_URL}/gerar-pdf/${doc}?tipo=${tipo}`, '_blank');
+    
+    if (!docInput) return alert("Por favor, insira um número para gerar o PDF.");
+    
+    const docLimpo = docInput.replace(/\D/g, ''); 
+    
+    const url = `${API_URL}/gerar-pdf/${docLimpo}?tipo=${tipo}`;
+    
+    window.open(url, '_blank');
 }
 </script>
 </body>
