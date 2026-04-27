@@ -5,86 +5,78 @@
     <title>Dados Smart - Login</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
-        .card-login { max-width: 400px; margin: 100px auto; }
+        .card-login { max-width: 400px; margin: 100px auto; border-radius: 15px; }
     </style>
 </head>
 <body class="bg-light">
-    <div id="notificacoes" class="toast-container"></div>
-
     <div class="card shadow card-login">
-        <div class="card-header bg-primary text-white text-center"><h4>Acesso Dados Smart</h4></div>
-        <div class="card-body">
+        <div class="card-header bg-primary text-white text-center">
+            <h4>Acesso Restrito</h4>
+            <small>Dados Smart Integrador</small>
+        </div>
+        <div class="card-body p-4">
             <div class="mb-3">
-                <label>Matrícula PMS:</label>
-                <input type="text" id="matricula" class="form-control" placeholder="Digite sua matrícula">
+                <label class="form-label">Matrícula:</label>
+                <input type="text" id="matricula" class="form-control" placeholder="Usuário">
             </div>
             <div class="mb-3">
-                <label>Senha:</label>
-                <input type="password" id="senha" class="form-control" placeholder="Digite sua senha">
+                <label class="form-label">Senha:</label>
+                <input type="password" id="senha" class="form-control" placeholder="Senha">
             </div>
-            <button onclick="realizarLogin()" class="btn btn-primary w-100">Entrar</button>
-            <hr>
-            <div class="text-center">
-                <a href="esqueci_senha.html" class="text-decoration-none">Esqueci minha senha</a><br>
-                <a href="fazer_cadastro.html" class="text-decoration-none">Criar nova conta</a>
+            <button onclick="realizarLogin()" class="btn btn-primary w-100 py-2">Entrar</button>
+            <div class="mt-4 text-center text-muted">
+                <small><i class="bi bi-lock"></i> Acesso permitido apenas para servidores autorizados.</small>
             </div>
         </div>
     </div>
 
     <script>
-        function avisar(msg, tipo="info") {
-            const id = 'toast' + Date.now();
-            const html = `<div id="${id}" class="alert alert-${tipo} alert-dismissible fade show shadow">
-                            ${msg} <button class="btn-close" data-bs-dismiss="alert"></button>
-                          </div>`;
-            document.getElementById('notificacoes').innerHTML += html;
-            setTimeout(() => { 
-                const el = document.getElementById(id);
-                if(el) el.remove(); 
-            }, 3000);
-        }
-
         async function realizarLogin() {
             const matricula = document.getElementById('matricula').value;
             const senha = document.getElementById('senha').value;
 
-            if (!matricula || !senha) {
-                avisar("Preencha todos os campos.", "warning");
-                return;
-            }
-
             try {
                 const res = await fetch("http://127.0.0.1:8000/auth/login", {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({matricula, senha})
-});
-                
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({matricula, senha})
+                });
                 const dados = await res.json();
 
                 if (res.ok) {
-                    // Armazena os dados da sessão
+                    sessionStorage.setItem("matricula", matricula);
+                    
+                    if (dados.precisa_mudar_senha) {
+                        alert("Primeiro Acesso ou Senha Resetada. Você deve criar uma nova senha agora.");
+                        const nova = prompt("Digite sua nova senha definitiva:");
+                        
+                        if(!nova || nova === "pms123" || nova === senha) {
+                            alert("Senha inválida ou muito fraca.");
+                            return;
+                        }
+                        
+                        const resTroca = await fetch("http://127.0.0.1:8000/auth/definir-nova-senha", {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ matricula: matricula, nova_senha: nova })
+                        });
+                        
+                        if(resTroca.ok) {
+                            alert("Senha atualizada! Por favor, faça login com a nova senha.");
+                            location.reload();
+                        }
+                        return;
+                    }
+
                     sessionStorage.setItem("usuarioLogado", "true");
                     sessionStorage.setItem("nomeUsuario", dados.nome);
                     sessionStorage.setItem("tipoUsuario", dados.tipo_usuario);
-
-                    avisar(dados.msg, "success");
-                    
-                    // Redirecionamento baseado no tipo de usuário retornado pelo servidor
-                    setTimeout(() => { 
-                        if (dados.tipo_usuario === "master") {
-                            window.location.href = "master.html";
-                        } else {
-                            window.location.href = "index.html";
-                        }
-                    }, 2000);
+                    window.location.href = (dados.tipo_usuario === "master") ? "master.html" : "index.html";
                 } else {
-                    // Exibe a mensagem de erro detalhada do servidor (ex: "Pendente de aprovação")
-                    avisar(dados.detail || "Erro ao realizar login.", "danger");
+                    alert(dados.detail || "Erro ao realizar login");
                 }
-            } catch (e) { 
-                avisar("Erro ao conectar com o servidor. Verifique se o backend está rodando.", "danger"); 
+            } catch (err) {
+                alert("Erro ao conectar com o servidor.");
             }
         }
     </script>

@@ -16,10 +16,20 @@ from email.mime.multipart import MIMEMultipart
 # Importação da sua lógica de busca
 from integracao import buscar_dados_reais
 
-# Modelo para o Login
+# --- MODELOS DE DADOS ---
+
 class LoginSchema(BaseModel):
     matricula: str
     senha: str
+
+class UserCreateSchema(BaseModel):
+    nome_completo: str
+    matricula: str
+    senha: str
+
+class NovaSenhaSchema(BaseModel):
+    matricula: str
+    nova_senha: str
 
 app = FastAPI(title="Dados Smart - Integrador")
 
@@ -31,12 +41,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- NOVA ROTA DE LOGIN ---
+# --- AUTENTICAÇÃO E LOGIN ---
+
 @app.post("/auth/login")
 async def login(dados: LoginSchema):
     conn = sqlite3.connect('dados_smart.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT nome_completo, autorizado, tipo_usuario FROM usuarios WHERE matricula = ? AND senha_hash = ?", 
+    # Busca incluindo a coluna senha_resetada e status de autorização
+    cursor.execute("SELECT nome_completo, autorizado, tipo_usuario, senha_resetada FROM usuarios WHERE matricula = ? AND senha_hash = ?", 
                    (dados.matricula, dados.senha))
     user = cursor.fetchone()
     conn.close()
@@ -44,18 +56,79 @@ async def login(dados: LoginSchema):
     if not user:
         raise HTTPException(status_code=401, detail="Matrícula ou senha incorretos.")
     
+    # Validação de status (0: Pendente, -1: Negado, 1: Autorizado)
     if user[1] == 0:
         raise HTTPException(status_code=403, detail="Seu cadastro ainda está pendente de aprovação.")
     elif user[1] == -1:
         raise HTTPException(status_code=403, detail="Seu acesso foi negado pelo administrador.")
+    elif user[1] != 1:
+        raise HTTPException(status_code=403, detail="Acesso desativado pelo administrador.")
 
     return {
         "msg": "Login realizado com sucesso!",
         "nome": user[0],
-        "tipo_usuario": user[2]
+        "tipo_usuario": user[2],
+        "precisa_mudar_senha": bool(user[3])
     }
 
-# --- ROTAS ORIGINAIS MANTIDAS ---
+# --- GESTÃO MASTER (USUÁRIOS) ---
+
+@app.post("/admin/criar-usuario")
+async def criar_usuario(dados: UserCreateSchema):
+    conn = sqlite3.connect('dados_smart.db')
+    cursor = conn.cursor()
+    try:
+        # Criado com senha_resetada=1 para forçar troca no primeiro acesso
+        # CPF é preenchido com a matrícula por padrão nesta rota simplificada
+        cursor.execute('''
+            INSERT INTO usuarios (matricula, cpf, nome_completo, email, senha_hash, autorizado, tipo_usuario, senha_resetada)
+            VALUES (?, ?, ?, ?, ?, 1, 'comum', 1)
+        ''', (dados.matricula, dados.matricula, dados.nome_completo, f"{dados.matricula}@pms.local", dados.senha))
+        conn.commit()
+        return {"msg": "Usuário criado com sucesso!"}
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="Matrícula já cadastrada.")
+    finally:
+        conn.close()
+
+@app.get("/admin/listar-usuarios")
+async def listar_usuarios():
+    conn = sqlite3.connect('dados_smart.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, matricula, nome_completo FROM usuarios WHERE tipo_usuario = 'comum'")
+    usuarios = cursor.fetchall()
+    conn.close()
+    return [{"id": u[0], "matricula": u[1], "nome": u[2]} for u in usuarios]
+
+@app.delete("/admin/usuario/{user_id}")
+async def remover_usuario(user_id: int):
+    conn = sqlite3.connect('dados_smart.db')
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM usuarios WHERE id = ? AND tipo_usuario != 'master'", (user_id,))
+    conn.commit()
+    conn.close()
+    return {"msg": "Usuário removido com sucesso!"}
+
+@app.post("/admin/reset-senha/{user_id}")
+async def resetar_senha_usuario(user_id: int):
+    conn = sqlite3.connect('dados_smart.db')
+    cursor = conn.cursor()
+    cursor.execute("UPDATE usuarios SET senha_hash = 'pms123', senha_resetada = 1 WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return {"msg": "Senha resetada para: pms123. O usuário deverá alterá-la no próximo acesso."}
+
+@app.post("/auth/definir-nova-senha")
+async def definir_nova_senha(dados: NovaSenhaSchema):
+    conn = sqlite3.connect('dados_smart.db')
+    cursor = conn.cursor()
+    cursor.execute("UPDATE usuarios SET senha_hash = ?, senha_resetada = 0 WHERE matricula = ?", 
+                   (dados.nova_senha, dados.matricula))
+    conn.commit()
+    conn.close()
+    return {"msg": "Senha atualizada com sucesso!"}
+
+# --- CONSULTAS E RELATÓRIOS ---
 
 @app.get("/consultar")
 async def consultar_documento(
@@ -83,11 +156,8 @@ async def gerar_excel_rota(
     tipo: Optional[str] = Query(None), 
     exercicio: Optional[List[str]] = Query(None)
 ):
-    # 1. Busca os dados reais
     dados = await consultar_documento(documento=documento, tipo=tipo or "documento", exercicio=exercicio)
     
-    # 2. Garante que todos os campos existam para o DataFrame não vir vazio
-    # Isso resolve o problema de campos "faltando" no Excel
     registro = {
         "Nome/Razão Social": dados.get("nome", "N/A"),
         "CPF/CNPJ": dados.get("documento", documento),
@@ -99,16 +169,12 @@ async def gerar_excel_rota(
         "Estornado": dados.get("estornado", "Não")
     }
     
-    # 3. Transforma em DataFrame
     df = pd.DataFrame([registro])
-
-    # 4. Gera o arquivo em memória
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Relatorio Dados Smart')
     
     output.seek(0)
-    
     return StreamingResponse(
         output, 
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -118,10 +184,9 @@ async def gerar_excel_rota(
 @app.get("/gerar-pdf/{documento}")
 async def gerar_pdf_rota(documento: str, tipo: Optional[str] = Query(None), exercicio: Optional[List[str]] = Query(None)):
     dados = await consultar_documento(documento=documento, tipo=tipo or "documento", exercicio=exercicio)
-    
     endereco_final = dados.get('endereco') or "Não informado"
 
-   html_template = f"""
+    html_template = f"""
     <html>
         <head>
             <meta charset="UTF-8">
@@ -142,7 +207,6 @@ async def gerar_pdf_rota(documento: str, tipo: Optional[str] = Query(None), exer
                 <div class="title">DADOS SMART</div>
                 <div>Relatório de Consulta Integrada</div>
             </div>
-            
             <div class="container">
                 <table class="info-table">
                     <tr><th colspan="2">Informações do Contribuinte</th></tr>
@@ -151,7 +215,6 @@ async def gerar_pdf_rota(documento: str, tipo: Optional[str] = Query(None), exer
                     <tr><td><strong>Data de Nascimento:</strong></td><td>{dados.get('data_nascimento', 'N/A')}</td></tr>
                     <tr><td><strong>Endereço:</strong></td><td>{endereco_final}</td></tr>
                 </table>
-
                 <table class="info-table" style="margin-top: 30px;">
                     <tr><th colspan="2">Detalhes Financeiros / Dívida Ativa</th></tr>
                     <tr><td><strong>Exercícios:</strong></td><td>{dados.get('exercicio', 'N/A')}</td></tr>
