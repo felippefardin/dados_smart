@@ -6,11 +6,20 @@ from typing import List, Optional
 import pdfkit
 import os
 import pandas as pd
+import sqlite3
 from io import BytesIO
 from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Importação da sua lógica de busca
 from integracao import buscar_dados_reais
+
+# Modelo para o Login
+class LoginSchema(BaseModel):
+    matricula: str
+    senha: str
 
 app = FastAPI(title="Dados Smart - Integrador")
 
@@ -21,6 +30,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- NOVA ROTA DE LOGIN ---
+@app.post("/auth/login")
+async def login(dados: LoginSchema):
+    conn = sqlite3.connect('dados_smart.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT nome_completo, autorizado, tipo_usuario FROM usuarios WHERE matricula = ? AND senha_hash = ?", 
+                   (dados.matricula, dados.senha))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Matrícula ou senha incorretos.")
+    
+    if user[1] == 0:
+        raise HTTPException(status_code=403, detail="Seu cadastro ainda está pendente de aprovação.")
+    elif user[1] == -1:
+        raise HTTPException(status_code=403, detail="Seu acesso foi negado pelo administrador.")
+
+    return {
+        "msg": "Login realizado com sucesso!",
+        "nome": user[0],
+        "tipo_usuario": user[2]
+    }
+
+# --- ROTAS ORIGINAIS MANTIDAS ---
 
 @app.get("/consultar")
 async def consultar_documento(
