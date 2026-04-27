@@ -1,23 +1,28 @@
 import requests
 from datetime import datetime
 
+# Token da API CPFHub
 API_TOKEN_CPFHUB = "2e8d63a30a8aa06092b6fad5bc02d7d4a9782bc704d578f9433635022b5119e6"
 
 def buscar_dados_reais(documento, exercicios=None):
+    """
+    Busca dados de CNPJ (BrasilAPI) ou CPF (CPFHub) e formata para o sistema.
+    """
     if not exercicios:
         exercicios = [str(datetime.now().year)]
     
     exercicios_str = ", ".join(exercicios)
+    # Remove caracteres não numéricos para a consulta nas APIs
     doc_limpo = "".join(filter(str.isdigit, documento))
     
-    if len(doc_limpo) == 14: # CNPJ via BrasilAPI
+    if len(doc_limpo) == 14: # Lógica para CNPJ via BrasilAPI
         url = f"https://brasilapi.com.br/api/cnpj/v1/{doc_limpo}"
         try:
             response = requests.get(url, timeout=15)
             if response.status_code == 200:
                 dados_api = response.json()
                 
-                # Mapeamento detalhado para evitar o "bloqueio" visual
+                # Mapeamento detalhado do endereço
                 logradouro = dados_api.get("logradouro", "N/A")
                 numero = dados_api.get("numero", "S/N")
                 bairro = dados_api.get("bairro", "N/A")
@@ -30,6 +35,7 @@ def buscar_dados_reais(documento, exercicios=None):
                 return {
                     "nome": dados_api.get("razao_social", "Nada Consta"),
                     "documento": documento,
+                    "data_nascimento": "N/A (PJ)", # Empresas não possuem data de nascimento
                     "exercicio": exercicios_str,
                     "endereco": endereco_completo,
                     "status": dados_api.get("descricao_situacao_cadastral", "ATIVA"),
@@ -39,7 +45,7 @@ def buscar_dados_reais(documento, exercicios=None):
         except Exception as e:
             print(f"Erro CNPJ: {e}")
 
-    elif len(doc_limpo) == 11: # CPF via CPFHub
+    elif len(doc_limpo) == 11: # Lógica para CPF via CPFHub
         url = f"https://api.cpfhub.io/cpf/{doc_limpo}"
         headers = {'x-api-key': API_TOKEN_CPFHUB, 'Accept': 'application/json'}
         try:
@@ -48,16 +54,21 @@ def buscar_dados_reais(documento, exercicios=None):
                 resposta = response.json()
                 if resposta.get("success"):
                     dados = resposta.get("data", {})
-                    # Tenta buscar o objeto de endereço (verificar se seu plano permite)
+                    
+                    # Tenta buscar a data de nascimento para preencher a tabela
+                    data_nasc = dados.get("birthDate") or dados.get("birth_date") or "N/A"
+                    
+                    # Tenta buscar o objeto de endereço
                     addr = dados.get("address", {})
                     if addr:
-                        end_cpf = f"{addr.get('street')}, {addr.get('number')} - {addr.get('city')}/{addr.get('state')}"
+                        end_cpf = f"{addr.get('street', 'N/A')}, {addr.get('number', 'S/N')} - {addr.get('city', 'N/A')}/{addr.get('state', 'N/A')}"
                     else:
-                        end_cpf = "Endereço não retornado pela API (Privacidade/Plano)"
+                        end_cpf = "Endereço indisponível no plano/API"
 
                     return {
                         "nome": dados.get("name", "N/A"),
                         "documento": documento,
+                        "data_nascimento": data_nasc, # AGORA A CHAVE EXISTE PARA O FRONTEND
                         "exercicio": exercicios_str,
                         "endereco": end_cpf,
                         "status": "REGULAR",

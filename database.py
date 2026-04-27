@@ -1,10 +1,11 @@
 import sqlite3
 
 def criar_banco():
+    # Conecta ao banco (será criado do zero se você deletou o antigo)
     conn = sqlite3.connect('dados_smart.db')
     cursor = conn.cursor()
     
-    # Tabela Unificada de Usuários
+    # Criar tabela de usuários com todas as colunas necessárias
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,7 +21,7 @@ def criar_banco():
         )
     ''')
     
-    # Tabela de Logs de Consulta
+    # Criar tabela de logs
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS logs_consulta (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,17 +33,18 @@ def criar_banco():
         )
     ''')
 
-    # Criar o usuário MASTER caso não exista
+    # Inserir o usuário MASTER padrão para o seu primeiro acesso
     cursor.execute("SELECT * FROM usuarios WHERE email = 'felippefardin@gmail.com'")
     if not cursor.fetchone():
         cursor.execute('''
             INSERT INTO usuarios (matricula, cpf, nome_completo, email, senha_hash, autorizado, tipo_usuario)
             VALUES ('MASTER', '00000000000', 'Felippe Master', 'felippefardin@gmail.com', 'admin123', 1, 'master')
         ''')
+        print("Usuário MASTER criado com sucesso!")
 
     conn.commit()
     conn.close()
 
 if __name__ == "__main__":
     criar_banco()
-    print("Banco de dados configurado com sucesso.")
+    print("Banco de dados configurado do zero com sucesso.")

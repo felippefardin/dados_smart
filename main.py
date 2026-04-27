@@ -3,12 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
-import pdfkit
 import os
 import pandas as pd
 import sqlite3
 from io import BytesIO
-from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -17,7 +15,6 @@ from email.mime.multipart import MIMEMultipart
 EMAIL_PADRAO = "felippefardin@gmail.com"
 SENHA_APP = "iypl fxqa oxjl dqzn"
 
-# Modelos de Dados
 class UserCreate(BaseModel):
     matricula: str
     cpf: str
@@ -41,7 +38,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Função Utilitária para Enviar E-mail
 def enviar_email(destinatario, assunto, corpo):
     try:
         server = smtplib.SMTP('smtp.gmail.com', 587)
@@ -88,23 +84,25 @@ async def cadastrar_usuario(dados: UserCreate):
     cursor = conn.cursor()
     try:
         cursor.execute('''
-            INSERT INTO usuarios (matricula, cpf, nome_completo, email, whatsapp, data_nascimento, senha_hash, autorizado)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+            INSERT INTO usuarios (matricula, cpf, nome_completo, email, whatsapp, data_nascimento, senha_hash, autorizado, tipo_usuario)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'comum')
         ''', (dados.matricula, dados.cpf, dados.nome_completo, dados.email, dados.celular, dados.data_nascimento, dados.senha))
         user_id = cursor.lastrowid
         conn.commit()
 
-        # Notifica o Master
+        # Notifica o Master por e-mail com links rápidos
         link_aprovar = f"http://127.0.0.1:8000/auth/aprovar/{user_id}?acao=1"
         link_negar = f"http://127.0.0.1:8000/auth/aprovar/{user_id}?acao=-1"
         
-        corpo = f"<h3>Novo Cadastro: {dados.nome_completo}</h3><p>Matrícula: {dados.matricula}</p>" \
-                f"<a href='{link_aprovar}'>AUTORIZAR</a> | <a href='{link_negar}'>NEGAR</a>"
-        enviar_email(EMAIL_PADRAO, "Novo Usuário Pendente", corpo)
+        corpo = f"<h3>Novo Cadastro Pendente</h3><p><b>Nome:</b> {dados.nome_completo}</p><p><b>Matrícula:</b> {dados.matricula}</p>" \
+                f"<p><a href='{link_aprovar}' style='background:green;color:white;padding:10px;text-decoration:none;'>AUTORIZAR ACESSO</a></p>" \
+                f"<p><a href='{link_negar}' style='background:red;color:white;padding:10px;text-decoration:none;'>NEGAR E REMOVER</a></p>"
+        enviar_email(EMAIL_PADRAO, "Novo Usuário no Sistema", corpo)
         
-        return {"msg": "Cadastro enviado! Aguarde a aprovação do administrador por e-mail."}
-    except Exception:
-        raise HTTPException(status_code=400, detail="Erro ao cadastrar. Matrícula ou E-mail já existem.")
+        return {"msg": "Cadastro enviado! Aguarde a aprovação."}
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=400, detail="Erro ao cadastrar. Verifique se os dados já existem.")
     finally:
         conn.close()
 
@@ -115,16 +113,18 @@ async def aprovar_usuario(user_id: int, acao: int):
     cursor.execute("SELECT email, nome_completo FROM usuarios WHERE id = ?", (user_id,))
     user = cursor.fetchone()
     
-    if not user: return "Usuário não encontrado."
+    if not user: 
+        conn.close()
+        return "Usuário não encontrado."
 
     if acao == 1:
         cursor.execute("UPDATE usuarios SET autorizado = 1 WHERE id = ?", (user_id,))
-        enviar_email(user[0], "Acesso Liberado", f"Olá {user[1]}, seu acesso foi autorizado!")
-        msg = "Usuário autorizado."
+        enviar_email(user[0], "Acesso Liberado - Dados Smart", f"Olá {user[1]}, seu acesso foi autorizado! Já pode logar.")
+        msg = "Usuário autorizado com sucesso."
     else:
         cursor.execute("DELETE FROM usuarios WHERE id = ?", (user_id,))
-        enviar_email(user[0], "Acesso Negado", f"Olá {user[1]}, seu cadastro não foi autorizado e foi removido.")
-        msg = "Usuário negado e removido."
+        enviar_email(user[0], "Cadastro Indeferido", f"Olá {user[1]}, seu cadastro não foi autorizado.")
+        msg = "Solicitação removida."
     
     conn.commit()
     conn.close()
@@ -134,27 +134,11 @@ async def aprovar_usuario(user_id: int, acao: int):
 async def listar_pendentes():
     conn = sqlite3.connect('dados_smart.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT id, nome_completo, matricula, email FROM usuarios WHERE autorizado = 0")
+    # Adicionado o campo 'id' na busca para o JavaScript poder usar
+    cursor.execute("SELECT id, matricula, nome_completo, email FROM usuarios WHERE autorizado = 0")
     usuarios = cursor.fetchall()
     conn.close()
-    return [{"id": u[0], "nome": u[1], "matricula": u[2], "email": u[3]} for u in usuarios]
-
-# --- ROTAS DE NEGÓCIO (CONSULTA / EXPORTAÇÃO) ---
-
-@app.get("/consultar")
-async def consultar(documento: str, tipo: str = "documento"):
-    # Sua lógica de integração aqui
-    return {"nome": "Exemplo", "documento": documento, "status": "Ativa", "valor_divida": "0,00"}
-
-@app.get("/gerar-excel/{documento}")
-async def excel(documento: str):
-    # Lógica simplificada de Excel
-    df = pd.DataFrame([{"Documento": documento, "Status": "Ativa"}])
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False)
-    output.seek(0)
-    return StreamingResponse(output, media_type="application/vnd.ms-excel", headers={"Content-Disposition": f"attachment; filename=relatorio.xlsx"})
+    return [{"id": u[0], "matricula": u[1], "nome": u[2], "email": u[3]} for u in usuarios]
 
 if __name__ == "__main__":
     import uvicorn

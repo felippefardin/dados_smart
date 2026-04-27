@@ -11,11 +11,11 @@
         }
     </script>
     <style>
-        .sidebar { height: 100vh; background: #212529; color: white; padding-top: 20px; }
+        .sidebar { height: 100vh; background: #212529; color: white; padding-top: 20px; position: fixed; width: inherit; }
         .sidebar a { color: #adb5bd; text-decoration: none; display: block; padding: 10px 20px; }
         .sidebar a:hover { background: #343a40; color: white; }
         .sidebar a.active { background: #0d6efd; color: white; }
-        .content { padding: 20px; }
+        .content { margin-left: 16.666667%; padding: 20px; width: 83.333333%; }
         .status-pendente { color: #ffc107; font-weight: bold; }
     </style>
 </head>
@@ -64,26 +64,58 @@
 <script>
     document.getElementById('nomeAdmin').innerText = sessionStorage.getItem("nomeUsuario");
 
-    // Função para carregar utilizadores (Simulação ou integração com API)
+    // Função para carregar usuários pendentes do banco de dados
     async function carregarPendentes() {
-        // Nota: Você pode criar uma rota @app.get("/admin/usuarios") no main.py para listar todos do banco
-        // Aqui está um exemplo de como tratar a linha da tabela dinamicamente
-        const lista = document.getElementById('listaPendentes');
+        try {
+            const res = await fetch("http://127.0.0.1:8000/admin/usuarios-pendentes");
+            const usuarios = await res.json();
+            const lista = document.getElementById('listaPendentes');
+            lista.innerHTML = ""; 
+
+            if (usuarios.length === 0) {
+                lista.innerHTML = "<tr><td colspan='5' class='text-center'>Nenhuma solicitação pendente.</td></tr>";
+                return;
+            }
+
+            usuarios.forEach(user => {
+                lista.innerHTML += `
+                    <tr>
+                        <td>${user.nome}</td>
+                        <td>${user.matricula}</td>
+                        <td>${user.email}</td>
+                        <td class="status-pendente">Pendente</td>
+                        <td>
+                            <button class="btn btn-sm btn-success" onclick="processarAcesso(${user.id}, 1)">Autorizar</button>
+                            <button class="btn btn-sm btn-danger" onclick="processarAcesso(${user.id}, -1)">Negar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        } catch (error) {
+            console.error("Erro ao carregar usuários:", error);
+        }
+    }
+
+    // Função para aprovar ou negar
+    window.processarAcesso = async (id, acao) => {
+        if (!confirm(acao === 1 ? "Autorizar este usuário?" : "Remover esta solicitação?")) return;
         
-        // Exemplo de como a função de aprovação funciona:
-        window.processarAcesso = async (id, acao) => {
+        try {
             const res = await fetch(`http://127.0.0.1:8000/auth/aprovar/${id}?acao=${acao}`);
             const msg = await res.text();
             alert(msg);
-            location.reload(); // Recarrega a lista
-        };
-    }
+            carregarPendentes(); // Recarrega a lista sem dar refresh na página toda
+        } catch (error) {
+            alert("Erro ao processar solicitação.");
+        }
+    };
 
     function logout() {
         sessionStorage.clear();
         window.location.href = "login.html";
     }
 
+    // Inicia a carga de dados
     carregarPendentes();
 </script>
 
