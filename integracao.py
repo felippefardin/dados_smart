@@ -7,45 +7,40 @@ API_TOKEN_CPFHUB = "2e8d63a30a8aa06092b6fad5bc02d7d4a9782bc704d578f9433635022b51
 def consultar_divida_ativa_federal(doc_limpo):
     """
     Consulta débitos na Dívida Ativa da União via API de Dados Abertos da PGFN.
-    Retorna o valor total formatado e os exercícios encontrados.
+    Retorna o valor total formatado e os anos (exercícios) encontrados.
     """
     url = f"https://dadosabertos.pgfn.gov.br/api/v1/devedores/{doc_limpo}"
     try:
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             dados = response.json()
             debitos = dados.get("debitos", [])
             
             if not debitos:
-                return "0,00", "N/A"
+                return "0,00", None
             
-            # Extrai os anos (exercícios) únicos das inscrições
-            anos_encontrados = set()
             valor_total = 0.0
+            anos = set()
             
             for d in debitos:
                 valor_total += d.get("valor_consolidado", 0.0)
-                # Tenta capturar o ano da data de inscrição (formato esperado: YYYY-MM-DD)
                 data_insc = d.get("data_inscricao")
                 if data_insc and "-" in data_insc:
-                    anos_encontrados.add(data_insc.split("-")[0])
+                    anos.add(data_insc.split("-")[0])
             
-            # Formata exercícios como string (ex: "2021, 2022")
-            exercicios_reais = ", ".join(sorted(anos_encontrados)) if anos_encontrados else "Não informado"
-            
-            # Formata o valor total como moeda brasileira
+            # Formatação Brasileira (R$ 1.234,56)
             valor_formatado = f"{valor_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            exercicios_reais = ", ".join(sorted(anos)) if anos else None
             
             return valor_formatado, exercicios_reais
-            
-        return "0,00", "N/A"
+        return "0,00", None
     except Exception as e:
-        print(f"Erro PGFN: {e}")
-        return "0,00", "Erro na API"
+        print(f"Erro PGFN (Dívida Federal): {e}")
+        return "0,00", None
 
 def buscar_dados_reais(documento, exercicios=None):
     """
-    Busca dados de CNPJ (BrasilAPI) ou CPF (CPFHub) e formata para o sistema.
+    Busca dados de CNPJ (BrasilAPI/OpenCNPJ) ou CPF (CPFHub) e integra com PGFN.
     """
     if not exercicios:
         exercicios = [str(datetime.now().year)]
@@ -53,68 +48,73 @@ def buscar_dados_reais(documento, exercicios=None):
     exercicios_default = ", ".join(exercicios)
     doc_limpo = "".join(filter(str.isdigit, documento))
     
-    if len(doc_limpo) == 14: # Lógica para CNPJ
+    # BUSCA DE VALOR E EXERCÍCIOS REAIS NA PGFN (Dívida Ativa da União)
+    valor_pgfn, anos_pgfn = consultar_divida_ativa_federal(doc_limpo)
+    exercicio_final = anos_pgfn if anos_pgfn else exercicios_default
+
+    # --- LÓGICA PARA CNPJ (PESSOA JURÍDICA) ---
+    if len(doc_limpo) == 14:
+        # Tenta BrasilAPI primeiro
         url = f"https://brasilapi.com.br/api/cnpj/v1/{doc_limpo}"
         try:
-            response = requests.get(url, timeout=15)
-            if response.status_code == 200:
-                dados_api = response.json()
-                
-                logradouro = dados_api.get("logradouro", "N/A")
-                numero = dados_api.get("numero", "S/N")
-                bairro = dados_api.get("bairro", "N/A")
-                cep = dados_api.get("cep", "N/A")
-                municipio = dados_api.get("municipio", "N/A")
-                uf = dados_api.get("uf", "N/A")
-                endereco_completo = f"{logradouro}, nº {numero}, {bairro} - {municipio}/{uf}, CEP: {cep}"
-                
-                # Busca valores e exercícios reais na PGFN
-                valor_real, anos_reais = consultar_divida_ativa_federal(doc_limpo)
-                
+            res = requests.get(url, timeout=10)
+            if res.status_code == 200:
+                d = res.json()
+                endereco = f"{d.get('logradouro')}, {d.get('numero')}, {d.get('bairro')} - {d.get('municipio')}/{d.get('uf')}"
                 return {
-                    "nome": dados_api.get("razao_social", "Nada Consta"),
+                    "nome": d.get("razao_social"),
                     "documento": documento,
                     "data_nascimento": "N/A (PJ)",
-                    "exercicio": anos_reais if anos_reais != "N/A" else exercicios_default,
-                    "endereco": endereco_completo,
-                    "status": dados_api.get("descricao_situacao_cadastral", "ATIVA"),
-                    "valor_divida": valor_real,
+                    "exercicio": exercicio_final,
+                    "endereco": endereco,
+                    "status": d.get("descricao_situacao_cadastral", "ATIVA"),
+                    "valor_divida": valor_pgfn,
+                    "estornado": "Não"
+                }
+            
+            # BACKUP: OpenCNPJ (Caso BrasilAPI falhe)
+            url_backup = f"https://kitana.opencnpj.com/cnpj/{doc_limpo}"
+            res_b = requests.get(url_backup, timeout=10)
+            if res_b.status_code == 200:
+                d = res_b.json()
+                return {
+                    "nome": d.get("razao_social"),
+                    "documento": documento,
+                    "data_nascimento": "N/A (PJ)",
+                    "exercicio": exercicio_final,
+                    "endereco": f"{d.get('logradouro')}, {d.get('bairro')} - {d.get('municipio')}/{d.get('uf')}",
+                    "status": "ATIVA",
+                    "valor_divida": valor_pgfn,
                     "estornado": "Não"
                 }
         except Exception as e:
-            print(f"Erro CNPJ: {e}")
+            print(f"Erro em APIs de CNPJ: {e}")
 
-    elif len(doc_limpo) == 11: # Lógica para CPF
+    # --- LÓGICA PARA CPF (PESSOA FÍSICA) ---
+    elif len(doc_limpo) == 11:
         url = f"https://api.cpfhub.io/cpf/{doc_limpo}"
         headers = {'x-api-key': API_TOKEN_CPFHUB, 'Accept': 'application/json'}
         try:
-            response = requests.get(url, headers=headers, timeout=15)
-            if response.status_code == 200:
-                resposta = response.json()
+            res = requests.get(url, headers=headers, timeout=10)
+            if res.status_code == 200:
+                resposta = res.json()
                 if resposta.get("success"):
-                    dados = resposta.get("data", {})
-                    data_nasc = dados.get("birthDate") or dados.get("birth_date") or "N/A"
-                    
-                    addr = dados.get("address", {})
-                    if addr:
-                        end_cpf = f"{addr.get('street', 'N/A')}, {addr.get('number', 'S/N')} - {addr.get('city', 'N/A')}/{addr.get('state', 'N/A')}"
-                    else:
-                        end_cpf = "Endereço indisponível no plano/API"
-
-                    # Busca valores e exercícios reais na PGFN
-                    valor_real, anos_reais = consultar_divida_ativa_federal(doc_limpo)
+                    d = resposta.get("data", {})
+                    data_nasc = d.get("birthDate") or d.get("birth_date") or "N/A"
+                    addr = d.get("address", {})
+                    end_str = f"{addr.get('street', 'N/A')}, {addr.get('number', 'S/N')} - {addr.get('city', 'N/A')}/{addr.get('state', 'N/A')}" if addr else "Não informado"
 
                     return {
-                        "nome": dados.get("name", "N/A"),
+                        "nome": d.get("name", "N/A"),
                         "documento": documento,
                         "data_nascimento": data_nasc,
-                        "exercicio": anos_reais if anos_reais != "N/A" else exercicios_default,
-                        "endereco": end_cpf,
+                        "exercicio": exercicio_final,
+                        "endereco": end_str,
                         "status": "REGULAR",
-                        "valor_divida": valor_real,
+                        "valor_divida": valor_pgfn,
                         "estornado": "Não"
                     }
         except Exception as e:
-            print(f"Erro CPF: {e}")
+            print(f"Erro CPFHub: {e}")
     
     return None
