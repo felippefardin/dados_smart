@@ -32,6 +32,24 @@
             border: 1px solid rgba(255,255,255,0.3);
         }
 
+        .feriados-card {
+            border-radius: 20px;
+            border: none;
+            background: #fff;
+            height: 100%;
+        }
+
+        .feriado-item {
+            font-size: 0.85rem;
+            padding: 12px;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.2s;
+        }
+
+        .feriado-item:hover {
+            background: #f8fafc;
+        }
+
         .opcoes-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -58,84 +76,104 @@
 </head>
 <body>
 
-<div class="container py-5">
-    <div class="text-center mb-5 no-print">
-        <h2 class="fw-bold" style="color: #1e293b;">Dados Smart</h2>
-        <p class="text-muted">Gestão Inteligente de Dados e Tributos</p>
-    </div>
-
-    <div class="card search-card no-print">
-        <div class="card-header bg-transparent p-4 border-bottom">
-            <h4 class="mb-0 text-primary fw-bold"><i class="bi bi-filter-right me-2"></i>Gerador de Relatórios</h4>
+<div class="container-fluid py-5">
+    <div class="row px-lg-5">
+        
+        <div class="col-lg-3 no-print mb-4">
+            <div class="card feriados-card shadow-sm">
+                <div class="card-header bg-white py-3 border-0">
+                    <h6 class="mb-0 fw-bold text-primary"><i class="bi bi-calendar-event me-2"></i>Feriados Nacionais</h6>
+                    <small class="text-muted">Controle de Prazos</small>
+                </div>
+                <div class="card-body p-0" id="listaFeriados" style="max-height: 600px; overflow-y: auto;">
+                    <div class="p-4 text-center text-muted small">
+                        <div class="spinner-border spinner-border-sm mb-2" role="status"></div><br>
+                        Carregando calendário...
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-body p-lg-5">
-            <form id="formConsulta" class="row g-4">
-                <div class="col-md-5">
-                    <label class="form-label fw-bold text-muted small">TIPO DE PESQUISA</label>
-                    <select id="tipoPesquisa" class="form-select shadow-sm">
-                        <option value="documento">CPF / CNPJ</option>
-                        <option value="cda">Número da CDA</option>
-                    </select>
-                </div>
-                <div class="col-md-7">
-                    <label class="form-label fw-bold text-muted small">IDENTIFICADOR</label>
-                    <div class="input-group shadow-sm">
-                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-hash text-primary"></i></span>
-                        <input type="text" id="documento" class="form-control border-start-0" placeholder="Digite apenas números">
-                    </div>
-                </div>
-                
-                <div class="col-12">
-                    <h6 class="fw-bold text-muted small text-uppercase mb-3">Campos Visíveis no Relatório</h6>
-                    <div id="opcoes-campos" class="opcoes-grid shadow-sm">
-                        <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="nome" checked>
-                            <span>Nome</span>
-                        </label>
-                        <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="documento" checked>
-                            <span>Documento</span>
-                        </label>
-                        <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="data_nascimento" checked>
-                            <span>Nascimento</span>
-                        </label>
-                        <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="exercicio" checked>
-                            <span>Exercício</span>
-                        </label>
-                        <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="valor_divida" checked>
-                            <span>Valor</span>
-                        </label>
-                        <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="status" checked>
-                            <span>Status</span>
-                        </label>
-                        <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="estornado" checked>
-                            <span>Estornado</span>
-                        </label>
-                        <label class="coluna-item">
-                            <input class="form-check-input coluna-opt me-3" type="checkbox" value="endereco" checked>
-                            <span>Endereço</span>
-                        </label>
-                    </div>
-                </div>
 
-                <div class="col-12 d-flex flex-wrap gap-3 mt-4">
-                    <button type="button" id="btnConsultar" onclick="consultar()" class="btn btn-primary px-4 shadow">
-                        <i class="bi bi-lightning-charge-fill me-2"></i>Visualizar Tabela
-                    </button>
-                    <button type="button" onclick="baixarPDF()" class="btn btn-danger px-4 shadow">
-                        <i class="bi bi-file-earmark-pdf-fill me-2"></i>PDF
-                    </button>
-                    <button type="button" onclick="baixarExcel()" class="btn btn-success px-4 shadow">
-                        <i class="bi bi-file-earmark-excel-fill me-2"></i>Excel
-                    </button>
-                    <button type="button" onclick="logout()" class="btn btn-outline-secondary px-4 ms-auto">Sair</button>
+        <div class="col-lg-9">
+            <div class="text-center mb-5 no-print">
+                <h2 class="fw-bold" style="color: #1e293b;">Dados Smart</h2>
+                <p class="text-muted">Gestão Inteligente de Dados e Tributos</p>
+            </div>
+
+            <div class="card search-card no-print">
+                <div class="card-header bg-transparent p-4 border-bottom">
+                    <h4 class="mb-0 text-primary fw-bold"><i class="bi bi-filter-right me-2"></i>Gerador de Relatórios</h4>
                 </div>
-            </form>
+                <div class="card-body p-lg-5">
+                    <form id="formConsulta" class="row g-4">
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold text-muted small">TIPO DE PESQUISA</label>
+                            <select id="tipoPesquisa" class="form-select shadow-sm">
+                                <option value="documento">CPF / CNPJ</option>
+                                <option value="cda">Número da CDA</option>
+                            </select>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label fw-bold text-muted small">IDENTIFICADOR</label>
+                            <div class="input-group shadow-sm">
+                                <span class="input-group-text bg-white border-end-0"><i class="bi bi-hash text-primary"></i></span>
+                                <input type="text" id="documento" class="form-control border-start-0" placeholder="Digite apenas números">
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <h6 class="fw-bold text-muted small text-uppercase mb-3">Campos Visíveis no Relatório</h6>
+                            <div id="opcoes-campos" class="opcoes-grid shadow-sm">
+                                <label class="coluna-item">
+                                    <input class="form-check-input coluna-opt me-3" type="checkbox" value="nome" checked>
+                                    <span>Nome</span>
+                                </label>
+                                <label class="coluna-item">
+                                    <input class="form-check-input coluna-opt me-3" type="checkbox" value="documento" checked>
+                                    <span>Documento</span>
+                                </label>
+                                <label class="coluna-item">
+                                    <input class="form-check-input coluna-opt me-3" type="checkbox" value="data_nascimento" checked>
+                                    <span>Nascimento</span>
+                                </label>
+                                <label class="coluna-item">
+                                    <input class="form-check-input coluna-opt me-3" type="checkbox" value="exercicio" checked>
+                                    <span>Exercício</span>
+                                </label>
+                                <label class="coluna-item">
+                                    <input class="form-check-input coluna-opt me-3" type="checkbox" value="valor_divida" checked>
+                                    <span>Valor</span>
+                                </label>
+                                <label class="coluna-item">
+                                    <input class="form-check-input coluna-opt me-3" type="checkbox" value="status" checked>
+                                    <span>Status</span>
+                                </label>
+                                <label class="coluna-item">
+                                    <input class="form-check-input coluna-opt me-3" type="checkbox" value="estornado" checked>
+                                    <span>Estornado</span>
+                                </label>
+                                <label class="coluna-item">
+                                    <input class="form-check-input coluna-opt me-3" type="checkbox" value="endereco" checked>
+                                    <span>Endereço</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 d-flex flex-wrap gap-3 mt-4">
+                            <button type="button" id="btnConsultar" onclick="consultar()" class="btn btn-primary px-4 shadow">
+                                <i class="bi bi-lightning-charge-fill me-2"></i>Visualizar Tabela
+                            </button>
+                            <button type="button" onclick="baixarPDF()" class="btn btn-danger px-4 shadow">
+                                <i class="bi bi-file-earmark-pdf-fill me-2"></i>PDF
+                            </button>
+                            <button type="button" onclick="baixarExcel()" class="btn btn-success px-4 shadow">
+                                <i class="bi bi-file-earmark-excel-fill me-2"></i>Excel
+                            </button>
+                            <button type="button" onclick="logout()" class="btn btn-outline-secondary px-4 ms-auto">Sair</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -170,7 +208,33 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!sessionStorage.getItem("usuarioLogado")) {
         window.location.href = "login.html";
     }
+
+    carregarFeriados();
 });
+
+async function carregarFeriados() {
+    try {
+        const res = await fetch(`${API_URL}/admin/feriados`);
+        const feriados = await res.json();
+        const container = document.getElementById('listaFeriados');
+        
+        if (feriados.length === 0) {
+            container.innerHTML = '<div class="p-4 text-center text-muted small">Nenhum feriado encontrado.</div>';
+            return;
+        }
+
+        container.innerHTML = feriados.map(f => `
+            <div class="feriado-item d-flex align-items-center">
+                <span class="badge bg-light text-primary border border-primary-subtle me-3" style="min-width: 55px;">
+                    ${f.date.split('-').reverse().slice(0,2).join('/')}
+                </span>
+                <span class="text-dark fw-semibold" style="font-size: 0.8rem;">${f.name}</span>
+            </div>
+        `).join('');
+    } catch (e) {
+        document.getElementById('listaFeriados').innerHTML = '<div class="p-4 text-center text-danger small">Erro ao carregar calendário.</div>';
+    }
+}
 
 async function consultar() {
     const docInput = document.getElementById('documento').value;
@@ -205,7 +269,6 @@ function renderizarTabela(dados) {
     const conteudo = document.getElementById('conteudoTabela');
     const checkboxes = document.querySelectorAll('.coluna-opt:checked');
     
-    // Mapeia quais colunas o usuário quer ver
     const colunasSelecionadas = Array.from(checkboxes).map(cb => ({ 
         id: cb.value, 
         label: cb.parentElement.querySelector('span').innerText 
@@ -215,13 +278,11 @@ function renderizarTabela(dados) {
     colunasSelecionadas.forEach(col => html += `<th>${col.label}</th>`);
     html += `</tr></thead><tbody>`;
 
-    // Garante que dados seja uma lista para o loop
     const listaResultados = Array.isArray(dados) ? dados : [dados];
 
     listaResultados.forEach(item => {
         html += `<tr>`;
         colunasSelecionadas.forEach(col => {
-            // Se o dado for nulo ou indefinido, mostra "N/A"
             let valor = item[col.id];
             if (valor === undefined || valor === null || valor === "") {
                 valor = `<span class="text-muted small">N/A</span>`;

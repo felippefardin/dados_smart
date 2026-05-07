@@ -38,9 +38,41 @@ def consultar_divida_ativa_federal(doc_limpo):
         print(f"Erro PGFN (Dívida Federal): {e}")
         return "0,00", None
 
+def consultar_cep(cep):
+    """
+    Consulta dados de endereço via BrasilAPI para validação e enriquecimento.
+    """
+    cep_limpo = "".join(filter(str.isdigit, str(cep)))
+    url = f"https://brasilapi.com.br/api/cep/v1/{cep_limpo}"
+    try:
+        res = requests.get(url, timeout=5)
+        if res.status_code == 200:
+            return res.json()
+        return None
+    except Exception as e:
+        print(f"Erro ao validar CEP {cep}: {e}")
+        return None
+
+def verificar_feriados_nacionais(ano=None):
+    """
+    Retorna a lista de feriados nacionais do ano corrente.
+    Útil para validação de dias úteis e prazos no painel.
+    """
+    ano_consulta = ano or datetime.now().year
+    url = f"https://brasilapi.com.br/api/feriados/v1/{ano_consulta}"
+    try:
+        res = requests.get(url, timeout=5)
+        if res.status_code == 200:
+            return res.json()
+        return []
+    except Exception as e:
+        print(f"Erro ao consultar feriados: {e}")
+        return []
+
 def buscar_dados_reais(documento, exercicios=None):
     """
     Busca dados de CNPJ (BrasilAPI/OpenCNPJ) ou CPF (CPFHub) e integra com PGFN.
+    Caso o endereço retornado seja incompleto, utiliza a API de CEP para enriquecer.
     """
     if not exercicios:
         exercicios = [str(datetime.now().year)]
@@ -54,13 +86,13 @@ def buscar_dados_reais(documento, exercicios=None):
 
     # --- LÓGICA PARA CNPJ (PESSOA JURÍDICA) ---
     if len(doc_limpo) == 14:
-        # Tenta BrasilAPI primeiro
         url = f"https://brasilapi.com.br/api/cnpj/v1/{doc_limpo}"
         try:
             res = requests.get(url, timeout=10)
             if res.status_code == 200:
                 d = res.json()
                 endereco = f"{d.get('logradouro')}, {d.get('numero')}, {d.get('bairro')} - {d.get('municipio')}/{d.get('uf')}"
+                
                 return {
                     "nome": d.get("razao_social"),
                     "documento": documento,
@@ -72,7 +104,7 @@ def buscar_dados_reais(documento, exercicios=None):
                     "estornado": "Não"
                 }
             
-            # BACKUP: OpenCNPJ (Caso BrasilAPI falhe)
+            # BACKUP: OpenCNPJ
             url_backup = f"https://kitana.opencnpj.com/cnpj/{doc_limpo}"
             res_b = requests.get(url_backup, timeout=10)
             if res_b.status_code == 200:
@@ -102,6 +134,18 @@ def buscar_dados_reais(documento, exercicios=None):
                     d = resposta.get("data", {})
                     data_nasc = d.get("birthDate") or d.get("birth_date") or "N/A"
                     addr = d.get("address", {})
+                    
+                    # ENRIQUECIMENTO DE ENDEREÇO VIA CEP
+                    # Se o endereço vier sem rua/logradouro mas tiver CEP, a gente complementa
+                    cep_cadastro = addr.get("zipcode") or addr.get("cep")
+                    if cep_cadastro and (not addr.get("street") or addr.get("street") == "N/A"):
+                        dados_cep = consultar_cep(cep_cadastro)
+                        if dados_cep:
+                            addr["street"] = dados_cep.get("street", "N/A")
+                            addr["city"] = dados_cep.get("city", "N/A")
+                            addr["state"] = dados_cep.get("state", "N/A")
+                            addr["neighborhood"] = dados_cep.get("neighborhood", "N/A")
+                    
                     end_str = f"{addr.get('street', 'N/A')}, {addr.get('number', 'S/N')} - {addr.get('city', 'N/A')}/{addr.get('state', 'N/A')}" if addr else "Não informado"
 
                     return {
