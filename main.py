@@ -15,7 +15,7 @@ from passlib.context import CryptContext
 from integracao import buscar_dados_reais, verificar_feriados_nacionais
 
 # Configuração de Hashing de Senha
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
 
 def gerar_hash(senha: str):
     return pwd_context.hash(senha)
@@ -50,13 +50,12 @@ app.add_middleware(
 
 # --- AUTENTICAÇÃO E LOGIN ---
 
-app.post("/auth/login")
+@app.post("/auth/login") # CORRIGIDO: Adicionado o @
 async def login(dados: LoginSchema):
     conn = sqlite3.connect('dados_smart.db')
     cursor = conn.cursor()
     
-    # Certifique-se de que a ordem dos campos no SELECT corresponde ao índice user[4]
-    # SELECT nome, autorizado, tipo, reset, senha_hash
+    # SELECT: nome(0), autorizado(1), tipo(2), reset(3), senha_hash(4)
     cursor.execute("SELECT nome_completo, autorizado, tipo_usuario, senha_resetada, senha_hash FROM usuarios WHERE matricula = ?", 
                    (dados.matricula,))
     user = cursor.fetchone()
@@ -65,7 +64,7 @@ async def login(dados: LoginSchema):
     if not user or not verificar_senha(dados.senha, user[4]):
         raise HTTPException(status_code=401, detail="Matrícula ou senha incorretos.")
     
-    # Validação de status (0: Pendente, -1: Negado, 1: Autorizado)
+    # Validação de status
     if user[1] == 0:
         raise HTTPException(status_code=403, detail="Seu cadastro ainda está pendente de aprovação.")
     elif user[1] == -1:

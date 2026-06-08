@@ -1,14 +1,14 @@
 import sqlite3
 from passlib.context import CryptContext
 
-# Define o contexto de hash
+# Define o contexto de hash para segurança da senha
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def criar_banco():
     conn = sqlite3.connect('dados_smart.db')
     cursor = conn.cursor()
     
-    # Cria as tabelas
+    # Cria a tabela de usuários
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,17 +25,18 @@ def criar_banco():
         )
     ''')
     
-    # Gera o hash da senha 'admin123'
-    senha_segura = pwd_context.hash('admin123')
-
-    # Verifica se o master já existe
-    cursor.execute("SELECT * FROM usuarios WHERE email = 'felippefardin@gmail.com'")
-    if not cursor.fetchone():
+    # Gera o hash da senha 'admin123456'
+    senha_usuario = pwd_context.hash('admin123456')
+    
+    # Insere o seu usuário
+    try:
         cursor.execute('''
             INSERT INTO usuarios (matricula, cpf, nome_completo, email, senha_hash, autorizado, tipo_usuario, senha_resetada)
-            VALUES (?, ?, ?, ?, ?, 1, 'master', 0)
-        ''', ('MASTER', '00000000000', 'Felippe Master', 'felippefardin@gmail.com', senha_segura))
-        print("Usuário MASTER criado com senha criptografada!")
+            VALUES (?, ?, ?, ?, ?, 1, 'comum', 0)
+        ''', ('103578', '00000000000', 'Seu Nome', 'seuemail@pms.local', senha_usuario))
+        print("Usuário 103578 criado com sucesso!")
+    except sqlite3.IntegrityError:
+        print("Usuário já existe no banco.")
 
     conn.commit()
     conn.close()
