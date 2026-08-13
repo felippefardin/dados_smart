@@ -52,7 +52,7 @@
     </div>
 
     <script>
-        const API_URL = "http://127.0.0.1:8000";
+        const API_URL = "http://127.0.0.1:8001";
 
         function avisar(msg, tipo="info") {
             const id = 'toast' + Date.now();
@@ -73,19 +73,23 @@
     const email = document.getElementById('emailRecuperacao').value;
 
     try {
-        const response = await fetch("http://127.0.0.1:8000/auth/esqueci-senha", {
+        const response = await fetch(`${API_URL}/auth/esqueci-senha`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: email })
         });
 
         if (response.ok) {
-            alert("Verifique sua caixa de entrada!");
+            document.getElementById('passo1').classList.add('hidden');
+            document.getElementById('passo2').classList.remove('hidden');
+            avisar("Se o e-mail estiver cadastrado, o código será enviado.", "success");
         } else {
             const erro = await response.json();
-            alert(erro.detail);
+            avisar(erro.detail || "Não foi possível enviar o código.", "danger");
         }
-    } catch (e) { alert("Erro de conexão."); }
+    } catch (e) {
+        avisar("Servidor desligado. Execute INICIAR_DADOS_SMART.bat e tente novamente.", "danger");
+    }
 }
 
         async function redefinirSenha() {

@@ -24,6 +24,8 @@
                 <input type="password" id="senha" class="form-control" placeholder="Senha">
             </div>
             <button onclick="realizarLogin()" class="btn btn-primary w-100 py-2">Entrar</button>
+            <a href="esqueci_senha.html" class="btn btn-link w-100 mt-2 text-decoration-none">Esqueci minha senha</a>
+            <a href="fazer_cadastro.html" class="btn btn-outline-primary w-100">Criar conta</a>
             <div class="mt-4 text-center text-muted">
                 <small><i class="bi bi-lock"></i> Acesso permitido apenas para servidores autorizados.</small>
             </div>
@@ -36,7 +38,7 @@
             const senha = document.getElementById('senha').value;
 
             try {
-                const res = await fetch("http://127.0.0.1:8000/auth/login", {
+                const res = await fetch("http://127.0.0.1:8001/auth/login", {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({matricula, senha})
@@ -55,7 +57,7 @@
                             return;
                         }
                         
-                        const resTroca = await fetch("http://127.0.0.1:8000/auth/definir-nova-senha", {
+                        const resTroca = await fetch("http://127.0.0.1:8001/auth/definir-nova-senha", {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ matricula: matricula, nova_senha: nova })

@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pydantic
+passlib
+pdfkit
+requests
+PyMySQL

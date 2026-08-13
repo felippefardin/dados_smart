@@ -2,6 +2,9 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Cadastro PMS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
@@ -9,15 +12,17 @@
     <div class="container bg-white p-4 shadow rounded" style="max-width: 600px;">
         <h3>Cadastro de Usuário - PMS</h3>
         <div id="step1">
-            <input type="text" id="mat" class="form-control mb-2" placeholder="Matrícula PMS">
-            <input type="text" id="cpf" class="form-control mb-2" placeholder="CPF">
-            <input type="text" id="nome" class="form-control mb-2" placeholder="Nome Completo">
-            <input type="email" id="email" class="form-control mb-2" placeholder="E-mail">
+            <div id="mensagem" class="alert d-none" role="alert"></div>
+            <input type="text" id="mat" class="form-control mb-2" placeholder="Matrícula PMS" required>
+            <input type="text" id="cpf" class="form-control mb-2" placeholder="CPF (somente números)" required>
+            <input type="text" id="nome" class="form-control mb-2" placeholder="Nome Completo" required>
+            <input type="email" id="email" class="form-control mb-2" placeholder="E-mail" required>
             <input type="text" id="cel" class="form-control mb-2" placeholder="Celular">
             <label>Data Nascimento:</label>
             <input type="date" id="nasc" class="form-control mb-2">
-            <input type="password" id="pass" class="form-control mb-3" placeholder="Senha Forte">
-            <button onclick="pedirCodigo()" class="btn btn-success w-100">Receber Código no E-mail</button>
+            <input type="password" id="pass" class="form-control mb-1" placeholder="Senha Forte" required>
+            <small class="text-muted d-block mb-3">Mínimo de 8 caracteres, com maiúscula, minúscula, número e símbolo.</small>
+            <button onclick="pedirCodigo()" id="btnCadastro" class="btn btn-success w-100">Receber Código no E-mail</button>
         </div>
 
         <div id="step2" style="display:none;">
@@ -31,6 +36,12 @@
 
        
         // Use apenas uma função para enviar o cadastro inicial
+        function mostrarMensagem(texto, tipo = 'danger') {
+            const caixa = document.getElementById('mensagem');
+            caixa.textContent = texto;
+            caixa.className = `alert alert-${tipo}`;
+        }
+
         async function pedirCodigo() {
             // Coleta os dados usando os IDs corretos do HTML
             const dados = {
@@ -44,13 +55,24 @@
             };
 
             // Validação básica antes de enviar
-            if (!dados.email || !dados.senha || !dados.matricula) {
-                alert("Por favor, preencha os campos obrigatórios.");
+            if (!dados.matricula || !dados.cpf || !dados.nome_completo || !dados.email || !dados.senha) {
+                mostrarMensagem("Preencha matrícula, CPF, nome, e-mail e senha.");
+                return;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dados.email)) {
+                mostrarMensagem("Digite um endereço de e-mail válido.");
+                return;
+            }
+            if (dados.senha.length < 8 || !/[a-z]/.test(dados.senha) || !/[A-Z]/.test(dados.senha) || !/\d/.test(dados.senha) || !/[^A-Za-z0-9]/.test(dados.senha)) {
+                mostrarMensagem("A senha precisa ter 8 caracteres ou mais, com maiúscula, minúscula, número e símbolo.");
                 return;
             }
 
+            const botao = document.getElementById('btnCadastro');
+            botao.disabled = true;
+            botao.textContent = "Enviando...";
             try {
-                const res = await fetch("http://127.0.0.1:8000/auth/cadastrar", {
+                const res = await fetch("http://127.0.0.1:8001/auth/cadastrar", {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(dados)
@@ -59,15 +81,18 @@
                 const result = await res.json();
 
                 if(res.ok) {
-                    alert("Código enviado para o seu e-mail!");
+                    mostrarMensagem("Código enviado para o seu e-mail!", "success");
                     document.getElementById('step1').style.display = 'none';
                     document.getElementById('step2').style.display = 'block';
                 } else {
-                    alert("Erro: " + (result.detail || "Falha ao cadastrar"));
+                    mostrarMensagem(result.detail || "Falha ao cadastrar.");
                 }
             } catch (error) {
                 console.error("Erro na conexão:", error);
-                alert("Não foi possível conectar ao servidor. Verifique se o backend está rodando na porta 8000.");
+                mostrarMensagem("Não foi possível conectar ao servidor. Execute INICIAR_DADOS_SMART.bat.");
+            } finally {
+                botao.disabled = false;
+                botao.textContent = "Receber Código no E-mail";
             }
         }
 
@@ -76,7 +101,7 @@
             const codigo = document.getElementById('codigo').value;
 
             try {
-                const res = await fetch("http://127.0.0.1:8000/auth/verificar-cadastro", {
+                const res = await fetch("http://127.0.0.1:8001/auth/verificar-cadastro", {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ email: email, codigo: codigo })

@@ -1,164 +1,190 @@
-import requests
+import os
+import re
 from datetime import datetime
 
-# Token da API CPFHub
-API_TOKEN_CPFHUB = "2e8d63a30a8aa06092b6fad5bc02d7d4a9782bc704d578f9433635022b5119e6"
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
-def consultar_divida_ativa_federal(doc_limpo):
-    """
-    Consulta débitos na Dívida Ativa da União via API de Dados Abertos da PGFN.
-    Retorna o valor total formatado e os anos (exercícios) encontrados.
-    """
-    url = f"https://dadosabertos.pgfn.gov.br/api/v1/devedores/{doc_limpo}"
-    try:
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            dados = response.json()
-            debitos = dados.get("debitos", [])
-            
-            if not debitos:
-                return "0,00", None
-            
-            valor_total = 0.0
-            anos = set()
-            
-            for d in debitos:
-                valor_total += d.get("valor_consolidado", 0.0)
-                data_insc = d.get("data_inscricao")
-                if data_insc and "-" in data_insc:
-                    anos.add(data_insc.split("-")[0])
-            
-            # Formatação Brasileira (R$ 1.234,56)
-            valor_formatado = f"{valor_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            exercicios_reais = ", ".join(sorted(anos)) if anos else None
-            
-            return valor_formatado, exercicios_reais
-        return "0,00", None
-    except Exception as e:
-        print(f"Erro PGFN (Dívida Federal): {e}")
-        return "0,00", None
+
+def _sessao_http():
+    retry = Retry(
+        total=3,
+        connect=3,
+        read=2,
+        status=3,
+        backoff_factor=0.7,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=frozenset(("GET",)),
+        respect_retry_after_header=True,
+    )
+    sessao = requests.Session()
+    sessao.headers.update({"Accept": "application/json", "User-Agent": "DadosSmart/1.0"})
+    sessao.mount("https://", HTTPAdapter(max_retries=retry))
+    return sessao
+
+
+HTTP = _sessao_http()
+
+
+def _somente_digitos(valor):
+    return re.sub(r"\D", "", str(valor or ""))
+
 
 def consultar_cep(cep):
-    """
-    Consulta dados de endereço via BrasilAPI para validação e enriquecimento.
-    """
-    cep_limpo = "".join(filter(str.isdigit, str(cep)))
-    url = f"https://brasilapi.com.br/api/cep/v1/{cep_limpo}"
+    cep_limpo = _somente_digitos(cep)
+    if len(cep_limpo) != 8:
+        return None
     try:
-        res = requests.get(url, timeout=5)
-        if res.status_code == 200:
-            return res.json()
-        return None
-    except Exception as e:
-        print(f"Erro ao validar CEP {cep}: {e}")
-        return None
+        resposta = HTTP.get(f"https://brasilapi.com.br/api/cep/v1/{cep_limpo}", timeout=(5, 15))
+        if resposta.status_code == 200:
+            return resposta.json()
+    except requests.RequestException as exc:
+        print(f"BrasilAPI CEP indisponível: {exc}")
+    return None
+
 
 def verificar_feriados_nacionais(ano=None):
-    """
-    Retorna a lista de feriados nacionais do ano corrente.
-    Útil para validação de dias úteis e prazos no painel.
-    """
-    ano_consulta = ano or datetime.now().year
-    url = f"https://brasilapi.com.br/api/feriados/v1/{ano_consulta}"
+    ano_consulta = int(ano or datetime.now().year)
+    if ano_consulta < 1900 or ano_consulta > 2199:
+        return []
     try:
-        res = requests.get(url, timeout=5)
-        if res.status_code == 200:
-            return res.json()
-        return []
-    except Exception as e:
-        print(f"Erro ao consultar feriados: {e}")
-        return []
+        resposta = HTTP.get(f"https://brasilapi.com.br/api/feriados/v1/{ano_consulta}", timeout=(5, 15))
+        if resposta.status_code == 200:
+            dados = resposta.json()
+            return dados if isinstance(dados, list) else []
+    except requests.RequestException as exc:
+        print(f"BrasilAPI Feriados indisponível: {exc}")
+    return []
+
+
+def _endereco(partes):
+    logradouro = partes.get("logradouro") or partes.get("street") or "Não informado"
+    numero = partes.get("numero") or partes.get("number") or "S/N"
+    bairro = partes.get("bairro") or partes.get("neighborhood") or ""
+    cidade = partes.get("municipio") or partes.get("city") or ""
+    uf = partes.get("uf") or partes.get("state") or ""
+    linha = f"{logradouro}, {numero}"
+    if bairro:
+        linha += f" - {bairro}"
+    if cidade or uf:
+        linha += f" - {cidade}/{uf}".rstrip("/")
+    return linha
+
+
+def _consultar_cnpj_brasilapi(cnpj):
+    resposta = HTTP.get(f"https://brasilapi.com.br/api/cnpj/v1/{cnpj}", timeout=(5, 20))
+    if resposta.status_code != 200:
+        return None
+    dados = resposta.json()
+    return {
+        "nome": dados.get("razao_social") or dados.get("nome_fantasia") or "Não informado",
+        "endereco": _endereco(dados),
+        "status": dados.get("descricao_situacao_cadastral") or "Não informado",
+        "fonte_cadastro": "BrasilAPI",
+    }
+
+
+def _consultar_cnpj_opencnpj(cnpj):
+    resposta = HTTP.get(f"https://kitana.opencnpj.com/cnpj/{cnpj}", timeout=(5, 20))
+    if resposta.status_code != 200:
+        return None
+    corpo = resposta.json()
+    dados = corpo.get("data") if isinstance(corpo, dict) else None
+    if not corpo.get("success") or not isinstance(dados, dict):
+        return None
+    return {
+        "nome": dados.get("razaoSocial") or dados.get("nomeFantasia") or "Não informado",
+        "endereco": _endereco(dados),
+        "status": dados.get("situacaoCadastral") or "Não informado",
+        "fonte_cadastro": "OpenCNPJ",
+    }
+
+
+def _consultar_cpf(cpf):
+    chave = os.getenv("API_TOKEN_CPFHUB", "").strip()
+    if not chave:
+        raise RuntimeError("API_TOKEN_CPFHUB não configurado")
+    resposta = HTTP.get(
+        f"https://api.cpfhub.io/cpf/{cpf}",
+        headers={"x-api-key": chave},
+        timeout=(5, 20),
+    )
+    if resposta.status_code != 200:
+        try:
+            erro = resposta.json().get("error", {})
+            print(f"CPFHub {resposta.status_code}: {erro.get('code')} - {erro.get('message')}")
+        except ValueError:
+            print(f"CPFHub retornou HTTP {resposta.status_code}")
+        return None
+    corpo = resposta.json()
+    dados = corpo.get("data", {})
+    if not corpo.get("success") or not isinstance(dados, dict):
+        return None
+    return {
+        "nome": dados.get("name") or "Não informado",
+        "data_nascimento": dados.get("birthDate") or "Não informado",
+        "endereco": "Não fornecido pela CPFHub",
+        "status": "CPF localizado",
+        "fonte_cadastro": "CPFHub",
+    }
+
 
 def buscar_dados_reais(documento, exercicios=None):
-    """
-    Busca dados de CNPJ (BrasilAPI/OpenCNPJ) ou CPF (CPFHub) e integra com PGFN.
-    Caso o endereço retornado seja incompleto, utiliza a API de CEP para enriquecer.
-    """
-    if not exercicios:
-        exercicios = [str(datetime.now().year)]
-    
-    exercicios_default = ", ".join(exercicios)
-    doc_limpo = "".join(filter(str.isdigit, documento))
-    
-    # BUSCA DE VALOR E EXERCÍCIOS REAIS NA PGFN (Dívida Ativa da União)
-    valor_pgfn, anos_pgfn = consultar_divida_ativa_federal(doc_limpo)
-    exercicio_final = anos_pgfn if anos_pgfn else exercicios_default
+    doc_limpo = _somente_digitos(documento)
+    exercicio = ", ".join(exercicios or [str(datetime.now().year)])
+    cadastro = None
 
-    # --- LÓGICA PARA CNPJ (PESSOA JURÍDICA) ---
-    if len(doc_limpo) == 14:
-        url = f"https://brasilapi.com.br/api/cnpj/v1/{doc_limpo}"
+    try:
+        if len(doc_limpo) == 14:
+            try:
+                cadastro = _consultar_cnpj_brasilapi(doc_limpo)
+            except requests.RequestException as exc:
+                print(f"BrasilAPI CNPJ indisponível: {exc}")
+            if not cadastro:
+                try:
+                    cadastro = _consultar_cnpj_opencnpj(doc_limpo)
+                except requests.RequestException as exc:
+                    print(f"OpenCNPJ indisponível: {exc}")
+            data_nascimento = "N/A (pessoa jurídica)"
+        elif len(doc_limpo) == 11:
+            cadastro = _consultar_cpf(doc_limpo)
+            data_nascimento = cadastro.get("data_nascimento") if cadastro else "Não informado"
+        else:
+            return None
+    except (RuntimeError, requests.RequestException, ValueError) as exc:
+        print(f"Falha na integração cadastral: {exc}")
+        return None
+
+    if not cadastro:
+        return None
+    return {
+        "nome": cadastro["nome"],
+        "documento": doc_limpo,
+        "data_nascimento": data_nascimento,
+        "exercicio": exercicio,
+        "endereco": cadastro["endereco"],
+        "status": cadastro["status"],
+        "valor_divida": "Não disponível",
+        "estornado": "Não informado",
+        "fonte_cadastro": cadastro["fonte_cadastro"],
+        "observacao_divida": "A PGFN não oferece o endpoint individual que o sistema utilizava anteriormente.",
+    }
+
+
+def diagnosticar_integracoes():
+    resultado = {}
+    testes = {
+        "brasilapi_cep": ("https://brasilapi.com.br/api/cep/v1/01001000", {}),
+        "brasilapi_feriados": (f"https://brasilapi.com.br/api/feriados/v1/{datetime.now().year}", {}),
+        "opencnpj": ("https://kitana.opencnpj.com/cnpj/00000000000191", {}),
+    }
+    for nome, (url, headers) in testes.items():
         try:
-            res = requests.get(url, timeout=10)
-            if res.status_code == 200:
-                d = res.json()
-                endereco = f"{d.get('logradouro')}, {d.get('numero')}, {d.get('bairro')} - {d.get('municipio')}/{d.get('uf')}"
-                
-                return {
-                    "nome": d.get("razao_social"),
-                    "documento": documento,
-                    "data_nascimento": "N/A (PJ)",
-                    "exercicio": exercicio_final,
-                    "endereco": endereco,
-                    "status": d.get("descricao_situacao_cadastral", "ATIVA"),
-                    "valor_divida": valor_pgfn,
-                    "estornado": "Não"
-                }
-            
-            # BACKUP: OpenCNPJ
-            url_backup = f"https://kitana.opencnpj.com/cnpj/{doc_limpo}"
-            res_b = requests.get(url_backup, timeout=10)
-            if res_b.status_code == 200:
-                d = res_b.json()
-                return {
-                    "nome": d.get("razao_social"),
-                    "documento": documento,
-                    "data_nascimento": "N/A (PJ)",
-                    "exercicio": exercicio_final,
-                    "endereco": f"{d.get('logradouro')}, {d.get('bairro')} - {d.get('municipio')}/{d.get('uf')}",
-                    "status": "ATIVA",
-                    "valor_divida": valor_pgfn,
-                    "estornado": "Não"
-                }
-        except Exception as e:
-            print(f"Erro em APIs de CNPJ: {e}")
-
-    # --- LÓGICA PARA CPF (PESSOA FÍSICA) ---
-    elif len(doc_limpo) == 11:
-        url = f"https://api.cpfhub.io/cpf/{doc_limpo}"
-        headers = {'x-api-key': API_TOKEN_CPFHUB, 'Accept': 'application/json'}
-        try:
-            res = requests.get(url, headers=headers, timeout=10)
-            if res.status_code == 200:
-                resposta = res.json()
-                if resposta.get("success"):
-                    d = resposta.get("data", {})
-                    data_nasc = d.get("birthDate") or d.get("birth_date") or "N/A"
-                    addr = d.get("address", {})
-                    
-                    # ENRIQUECIMENTO DE ENDEREÇO VIA CEP
-                    # Se o endereço vier sem rua/logradouro mas tiver CEP, a gente complementa
-                    cep_cadastro = addr.get("zipcode") or addr.get("cep")
-                    if cep_cadastro and (not addr.get("street") or addr.get("street") == "N/A"):
-                        dados_cep = consultar_cep(cep_cadastro)
-                        if dados_cep:
-                            addr["street"] = dados_cep.get("street", "N/A")
-                            addr["city"] = dados_cep.get("city", "N/A")
-                            addr["state"] = dados_cep.get("state", "N/A")
-                            addr["neighborhood"] = dados_cep.get("neighborhood", "N/A")
-                    
-                    end_str = f"{addr.get('street', 'N/A')}, {addr.get('number', 'S/N')} - {addr.get('city', 'N/A')}/{addr.get('state', 'N/A')}" if addr else "Não informado"
-
-                    return {
-                        "nome": d.get("name", "N/A"),
-                        "documento": documento,
-                        "data_nascimento": data_nasc,
-                        "exercicio": exercicio_final,
-                        "endereco": end_str,
-                        "status": "REGULAR",
-                        "valor_divida": valor_pgfn,
-                        "estornado": "Não"
-                    }
-        except Exception as e:
-            print(f"Erro CPFHub: {e}")
-    
-    return None
+            resposta = HTTP.get(url, headers=headers, timeout=(5, 15))
+            resultado[nome] = {"ok": resposta.status_code == 200, "http": resposta.status_code}
+        except requests.RequestException as exc:
+            resultado[nome] = {"ok": False, "erro": type(exc).__name__}
+    resultado["cpfhub_configurada"] = {"ok": bool(os.getenv("API_TOKEN_CPFHUB", "").strip())}
+    resultado["pgfn"] = {"ok": False, "motivo": "endpoint individual anterior inexistente"}
+    return resultado
